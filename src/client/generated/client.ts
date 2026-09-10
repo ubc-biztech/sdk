@@ -130,7 +130,7 @@ const meta = {
   },
   "judging.team.update": {
     key: "judging.team.update", method: "PUT", path: "/judging/{eventID}/{year}/teams/{id}", query: [], fixedQuery: {},
-    auth: "judgingCode", input: S.JudgingTeamUpdateWireSchema, output: S.JudgingTeamUpdateOutputSchema, errors: { 404: E.TeamNotFoundError, 403: E.ForbiddenError },
+    auth: "judgingCode", input: S.JudgingTeamUpdateWireSchema, output: S.JudgingTeamUpdateOutputSchema, errors: { 404: E.TeamNotFoundError, 403: E.ForbiddenError, 409: E.SubmissionsLockedError },
   },
   "judging.team.delete": {
     key: "judging.team.delete", method: "DELETE", path: "/judging/{eventID}/{year}/teams/{id}", query: [], fixedQuery: {},
@@ -426,7 +426,7 @@ export function createClient(config: ClientConfig) {
       /** Event phase and configuration. A singleton per event. */
       settings: {
         /**
-         * Current settings. Public so the landing page can show the phase before login. `finalsJudgeIds` and `finalsTeamIds` are included.
+         * Current settings. Public so the landing page can show the phase and event name before login.
          * 
          * Auth: `public` — No token required. Anyone on the internet.
          * Route: `GET /judging/{eventID}/{year}/settings`
@@ -488,11 +488,11 @@ export function createClient(config: ClientConfig) {
          */
         get: () => rt.call<S.JudgingTeamGetOutput>(meta["judging.team.get"], { eventID, year, id }),
         /**
-         * Replace the editable fields. A team's own code may update its own team (submission page); admins may update any.
+         * Replace the editable fields. A team's own code may update its own team while the phase is `submission` and submissions are not locked; admins may update any team at any time.
          * 
          * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
          * Route: `PUT /judging/{eventID}/{year}/teams/{id}`
-         * Throws: `TeamNotFoundError` (404) No such team.; `ForbiddenError` (403) A team code tried to edit a different team.
+         * Throws: `TeamNotFoundError` (404) No such team.; `ForbiddenError` (403) A team code tried to edit a different team.; `SubmissionsLockedError` (409) Phase is past `submission` or `lockSubmissions` is on.
          */
         update: (input: S.JudgingTeamUpdateInput) => rt.call<S.JudgingTeamUpdateOutput>(meta["judging.team.update"], { eventID, year, id, ...input }),
         /**
@@ -571,7 +571,7 @@ export function createClient(config: ClientConfig) {
       /** Scores. Judges submit with `reviews.submit`; everyone reads with `reviews.list`. */
       reviews: {
         /**
-         * Reviews, filtered. Judges see all reviews; a team code sees only its own team's reviews, and only when `resultsPublic`. Admins see everything.
+         * Reviews, filtered. Admins see everything. Judges see everything when `allowJudgeSeeOthers`, else only their own. A team code sees only its own team's reviews, and only when `showTeamFeedback`.
          * 
          * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
          * Route: `GET /judging/{eventID}/{year}/reviews`
@@ -579,11 +579,11 @@ export function createClient(config: ClientConfig) {
          */
         list: (input: S.JudgingReviewsListInput = {}) => rt.call<S.JudgingReviewsListOutput>(meta["judging.reviews.list"], { eventID, year, ...input }),
         /**
-         * Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finals teams.
+         * Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finalist teams.
          * 
          * Auth: `judge` — Bearer token is a judge code for the event.
          * Route: `POST /judging/{eventID}/{year}/reviews`
-         * Throws: `TeamNotFoundError` (404) No such team.; `InvalidScoresError` (400) A criterion is missing, extra, or out of range.; `PhaseClosedError` (409) The phase is `setup` or `closed`, or this judge is not a finals judge / team is not a finalist.
+         * Throws: `TeamNotFoundError` (404) No such team.; `InvalidScoresError` (400) A criterion is missing, extra, or out of range.; `PhaseClosedError` (409) The phase is `submission` or `closed`, or this judge is not a finals judge / team is not a finalist.
          */
         submit: (input: S.JudgingReviewsSubmitInput) => rt.call<S.JudgingReviewsSubmitOutput>(meta["judging.reviews.submit"], { eventID, year, ...input }),
       },

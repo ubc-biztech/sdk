@@ -12,7 +12,7 @@ Scoped under `bt.judging(eventID, year)`: One event's judging. Keyed like Event:
 
 ## `bt.judging(eventID, year).reviews.list(input)`
 
-Reviews, filtered. Judges see all reviews; a team code sees only its own team's reviews, and only when `resultsPublic`. Admins see everything.
+Reviews, filtered. Admins see everything. Judges see everything when `allowJudgeSeeOthers`, else only their own. A team code sees only its own team's reviews, and only when `showTeamFeedback`.
 
 - **Auth:** `judgingCode`
 - **Route:** `GET /judging/{eventID}/{year}/reviews`
@@ -35,7 +35,7 @@ Reviews, filtered. Judges see all reviews; a team code sees only its own team's 
 
 ## `bt.judging(eventID, year).reviews.submit(input)`
 
-Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finals teams.
+Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finalist teams.
 
 - **Auth:** `judge`
 - **Route:** `POST /judging/{eventID}/{year}/reviews`
@@ -56,7 +56,7 @@ Create or replace the caller's review of a team for the current phase's round. T
 |---|---|---|
 | `TeamNotFoundError` | 404 | No such team. |
 | `InvalidScoresError` | 400 | A criterion is missing, extra, or out of range. |
-| `PhaseClosedError` | 409 | The phase is `setup` or `closed`, or this judge is not a finals judge / team is not a finalist. |
+| `PhaseClosedError` | 409 | The phase is `submission` or `closed`, or this judge is not a finals judge / team is not a finalist. |
 
 ## `bt.judging(eventID, year).review(id).get()`
 

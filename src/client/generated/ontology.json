@@ -606,12 +606,12 @@
         "phase": {
           "kind": "enum",
           "values": [
-            "setup",
+            "submission",
             "prelim",
             "finals",
             "closed"
           ],
-          "description": "Where the event is. Judges can only submit in `prelim` and `finals`; results are public in `closed`."
+          "description": "`submission`: teams edit their entries, no judging. `prelim`: all judges score their assigned teams. `finals`: finals judges score finalist teams. `closed`: nothing changes; results may be shown."
         },
         "perTeamJudges": {
           "kind": "integer",
@@ -637,9 +637,25 @@
           },
           "description": "Judges who score finals. Empty until finals are set up."
         },
-        "resultsPublic": {
+        "showTeamFeedback": {
           "kind": "boolean",
-          "description": "Teams may see their own feedback and the leaderboard."
+          "description": "Teams may see their own reviews and the leaderboard."
+        },
+        "allowJudgeSeeOthers": {
+          "kind": "boolean",
+          "description": "Judges may read other judges' reviews. When false, `reviews.list` returns a judge only their own."
+        },
+        "anonymizeTeams": {
+          "kind": "boolean",
+          "description": "Hide team names from judges (UI concern; the API still returns names to judges)."
+        },
+        "lockSubmissions": {
+          "kind": "boolean",
+          "description": "Teams may no longer edit their entries, regardless of phase."
+        },
+        "maxImages": {
+          "kind": "integer",
+          "description": "Maximum screenshots per team."
         },
         "updatedAt": {
           "kind": "string",
@@ -1856,7 +1872,7 @@
               "description": "No judging has been set up for this event. `settings.set` creates it."
             }
           },
-          "description": "Current settings. Public so the landing page can show the phase before login. `finalsJudgeIds` and `finalsTeamIds` are included.",
+          "description": "Current settings. Public so the landing page can show the phase and event name before login.",
           "auth": "public",
           "output": {
             "kind": "ref",
@@ -1875,25 +1891,25 @@
           "input": {
             "eventName": {
               "kind": "string",
-              "description": "Display name."
+              "description": "Display name, e.g. `HelloHacks 2027`."
             },
             "phase": {
               "kind": "enum",
               "values": [
-                "setup",
+                "submission",
                 "prelim",
                 "finals",
                 "closed"
               ],
-              "description": "Phase."
+              "description": "`submission`: teams edit their entries, no judging. `prelim`: all judges score their assigned teams. `finals`: finals judges score finalist teams. `closed`: nothing changes; results may be shown."
             },
             "perTeamJudges": {
               "kind": "integer",
-              "description": "Judges per team for auto-assign."
+              "description": "How many judges auto-assign gives each team."
             },
             "finalsTopN": {
               "kind": "integer",
-              "description": "Default number of finalists."
+              "description": "How many prelim teams advance to finals by default."
             },
             "finalsTeamIds": {
               "kind": "array",
@@ -1901,7 +1917,7 @@
                 "kind": "string",
                 "description": "Team id."
               },
-              "description": "Finalist teams."
+              "description": "Teams in the finals round. Empty until finals are set up."
             },
             "finalsJudgeIds": {
               "kind": "array",
@@ -1909,11 +1925,27 @@
                 "kind": "string",
                 "description": "Judge id."
               },
-              "description": "Finals judges."
+              "description": "Judges who score finals. Empty until finals are set up."
             },
-            "resultsPublic": {
+            "showTeamFeedback": {
               "kind": "boolean",
-              "description": "Teams may see results."
+              "description": "Teams may see their own reviews and the leaderboard."
+            },
+            "allowJudgeSeeOthers": {
+              "kind": "boolean",
+              "description": "Judges may read other judges' reviews. When false, `reviews.list` returns a judge only their own."
+            },
+            "anonymizeTeams": {
+              "kind": "boolean",
+              "description": "Hide team names from judges (UI concern; the API still returns names to judges)."
+            },
+            "lockSubmissions": {
+              "kind": "boolean",
+              "description": "Teams may no longer edit their entries, regardless of phase."
+            },
+            "maxImages": {
+              "kind": "integer",
+              "description": "Maximum screenshots per team."
             }
           },
           "output": {
@@ -2169,9 +2201,13 @@
             "Forbidden": {
               "status": 403,
               "description": "A team code tried to edit a different team."
+            },
+            "SubmissionsLocked": {
+              "status": 409,
+              "description": "Phase is past `submission` or `lockSubmissions` is on."
             }
           },
-          "description": "Replace the editable fields. A team's own code may update its own team (submission page); admins may update any.",
+          "description": "Replace the editable fields. A team's own code may update its own team while the phase is `submission` and submissions are not locked; admins may update any team at any time.",
           "auth": "judgingCode",
           "input": {
             "name": {
@@ -2493,7 +2529,7 @@
               "description": "A team code asked for another team, or results are not public yet."
             }
           },
-          "description": "Reviews, filtered. Judges see all reviews; a team code sees only its own team's reviews, and only when `resultsPublic`. Admins see everything.",
+          "description": "Reviews, filtered. Admins see everything. Judges see everything when `allowJudgeSeeOthers`, else only their own. A team code sees only its own team's reviews, and only when `showTeamFeedback`.",
           "auth": "judgingCode",
           "input": {
             "round": {
@@ -2547,10 +2583,10 @@
             },
             "PhaseClosed": {
               "status": 409,
-              "description": "The phase is `setup` or `closed`, or this judge is not a finals judge / team is not a finalist."
+              "description": "The phase is `submission` or `closed`, or this judge is not a finals judge / team is not a finalist."
             }
           },
-          "description": "Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finals teams.",
+          "description": "Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finalist teams.",
           "auth": "judge",
           "input": {
             "teamId": {

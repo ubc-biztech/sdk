@@ -352,8 +352,8 @@ export const NormalizedTeamScoreSchema: z.ZodType<NormalizedTeamScore> = z.objec
 export interface JudgingSettings {
   /** Display name, e.g. `HelloHacks 2027`. */
   eventName: string;
-  /** Where the event is. Judges can only submit in `prelim` and `finals`; results are public in `closed`. */
-  phase: "setup" | "prelim" | "finals" | "closed";
+  /** `submission`: teams edit their entries, no judging. `prelim`: all judges score their assigned teams. `finals`: finals judges score finalist teams. `closed`: nothing changes; results may be shown. */
+  phase: "submission" | "prelim" | "finals" | "closed";
   /** How many judges auto-assign gives each team. */
   perTeamJudges: number;
   /** How many prelim teams advance to finals by default. */
@@ -362,19 +362,31 @@ export interface JudgingSettings {
   finalsTeamIds: string[];
   /** Judges who score finals. Empty until finals are set up. */
   finalsJudgeIds: string[];
-  /** Teams may see their own feedback and the leaderboard. */
-  resultsPublic: boolean;
+  /** Teams may see their own reviews and the leaderboard. */
+  showTeamFeedback: boolean;
+  /** Judges may read other judges' reviews. When false, `reviews.list` returns a judge only their own. */
+  allowJudgeSeeOthers: boolean;
+  /** Hide team names from judges (UI concern; the API still returns names to judges). */
+  anonymizeTeams: boolean;
+  /** Teams may no longer edit their entries, regardless of phase. */
+  lockSubmissions: boolean;
+  /** Maximum screenshots per team. */
+  maxImages: number;
   /** ISO-8601. */
   updatedAt: string;
 }
 export const JudgingSettingsSchema: z.ZodType<JudgingSettings> = z.object({
   eventName: z.string(),
-  phase: z.enum(["setup", "prelim", "finals", "closed"]),
+  phase: z.enum(["submission", "prelim", "finals", "closed"]),
   perTeamJudges: z.number().int(),
   finalsTopN: z.number().int(),
   finalsTeamIds: z.array(z.string()),
   finalsJudgeIds: z.array(z.string()),
-  resultsPublic: z.boolean(),
+  showTeamFeedback: z.boolean(),
+  allowJudgeSeeOthers: z.boolean(),
+  anonymizeTeams: z.boolean(),
+  lockSubmissions: z.boolean(),
+  maxImages: z.number().int(),
   updatedAt: z.string(),
 });
 
@@ -1045,31 +1057,43 @@ export const JudgingSettingsGetOutputSchema: z.ZodType<JudgingSettingsGetOutput>
 
 /** Input for `bt.judging(eventID, year).settings.set`. */
 export interface JudgingSettingsSetInput {
-  /** Display name. */
+  /** Display name, e.g. `HelloHacks 2027`. */
   eventName: string;
-  /** Phase. */
-  phase: "setup" | "prelim" | "finals" | "closed";
-  /** Judges per team for auto-assign. */
+  /** `submission`: teams edit their entries, no judging. `prelim`: all judges score their assigned teams. `finals`: finals judges score finalist teams. `closed`: nothing changes; results may be shown. */
+  phase: "submission" | "prelim" | "finals" | "closed";
+  /** How many judges auto-assign gives each team. */
   perTeamJudges: number;
-  /** Default number of finalists. */
+  /** How many prelim teams advance to finals by default. */
   finalsTopN: number;
-  /** Finalist teams. */
+  /** Teams in the finals round. Empty until finals are set up. */
   finalsTeamIds: string[];
-  /** Finals judges. */
+  /** Judges who score finals. Empty until finals are set up. */
   finalsJudgeIds: string[];
-  /** Teams may see results. */
-  resultsPublic: boolean;
+  /** Teams may see their own reviews and the leaderboard. */
+  showTeamFeedback: boolean;
+  /** Judges may read other judges' reviews. When false, `reviews.list` returns a judge only their own. */
+  allowJudgeSeeOthers: boolean;
+  /** Hide team names from judges (UI concern; the API still returns names to judges). */
+  anonymizeTeams: boolean;
+  /** Teams may no longer edit their entries, regardless of phase. */
+  lockSubmissions: boolean;
+  /** Maximum screenshots per team. */
+  maxImages: number;
 }
 export const JudgingSettingsSetWireSchema = z.object({
   eventID: z.string(),
   year: z.number().int(),
   eventName: z.string(),
-  phase: z.enum(["setup", "prelim", "finals", "closed"]),
+  phase: z.enum(["submission", "prelim", "finals", "closed"]),
   perTeamJudges: z.number().int(),
   finalsTopN: z.number().int(),
   finalsTeamIds: z.array(z.string()),
   finalsJudgeIds: z.array(z.string()),
-  resultsPublic: z.boolean(),
+  showTeamFeedback: z.boolean(),
+  allowJudgeSeeOthers: z.boolean(),
+  anonymizeTeams: z.boolean(),
+  lockSubmissions: z.boolean(),
+  maxImages: z.number().int(),
 });
 /** Everything the server receives for `bt.judging(eventID, year).settings.set`: scope key, resource key, and input. */
 export type JudgingSettingsSetWire = z.infer<typeof JudgingSettingsSetWireSchema>;

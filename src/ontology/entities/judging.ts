@@ -28,19 +28,25 @@ const ok = (what: string) => obj({ message: str({ description: "Human-readable c
 
 // ─── Entities ─────────────────────────────────────────────────────────
 
+const PHASES = ["submission", "prelim", "finals", "closed"] as const;
+const settingsFields = {
+  eventName: str({ description: "Display name, e.g. `HelloHacks 2027`." }),
+  phase: oneOf(PHASES, { description: "`submission`: teams edit their entries, no judging. `prelim`: all judges score their assigned teams. `finals`: finals judges score finalist teams. `closed`: nothing changes; results may be shown." }),
+  perTeamJudges: int({ description: "How many judges auto-assign gives each team." }),
+  finalsTopN: int({ description: "How many prelim teams advance to finals by default." }),
+  finalsTeamIds: list(str({ description: "Team id." }), { description: "Teams in the finals round. Empty until finals are set up." }),
+  finalsJudgeIds: list(str({ description: "Judge id." }), { description: "Judges who score finals. Empty until finals are set up." }),
+  showTeamFeedback: bool({ description: "Teams may see their own reviews and the leaderboard." }),
+  allowJudgeSeeOthers: bool({ description: "Judges may read other judges' reviews. When false, `reviews.list` returns a judge only their own." }),
+  anonymizeTeams: bool({ description: "Hide team names from judges (UI concern; the API still returns names to judges)." }),
+  lockSubmissions: bool({ description: "Teams may no longer edit their entries, regardless of phase." }),
+  maxImages: int({ description: "Maximum screenshots per team." }),
+};
+
 export const JudgingSettings = entity({
   name: "JudgingSettings",
   description: "Per-event judging configuration and phase. One record per event.",
-  fields: {
-    eventName: str({ description: "Display name, e.g. `HelloHacks 2027`." }),
-    phase: oneOf(["setup", "prelim", "finals", "closed"], { description: "Where the event is. Judges can only submit in `prelim` and `finals`; results are public in `closed`." }),
-    perTeamJudges: int({ description: "How many judges auto-assign gives each team." }),
-    finalsTopN: int({ description: "How many prelim teams advance to finals by default." }),
-    finalsTeamIds: list(str({ description: "Team id." }), { description: "Teams in the finals round. Empty until finals are set up." }),
-    finalsJudgeIds: list(str({ description: "Judge id." }), { description: "Judges who score finals. Empty until finals are set up." }),
-    resultsPublic: bool({ description: "Teams may see their own feedback and the leaderboard." }),
-    updatedAt: str({ description: "ISO-8601." }),
-  },
+  fields: { ...settingsFields, updatedAt: str({ description: "ISO-8601." }) },
 });
 
 export const Rubric = entity({
@@ -168,7 +174,7 @@ export const judgingSettings = resource({
   description: "Event phase and configuration. A singleton per event.",
   instance: {
     get: action({
-      description: "Current settings. Public so the landing page can show the phase before login. `finalsJudgeIds` and `finalsTeamIds` are included.",
+      description: "Current settings. Public so the landing page can show the phase and event name before login.",
       auth: "public",
       output: ref(JudgingSettings, { description: "The settings." }),
       errors: { EventNotFound: { status: 404, description: "No judging has been set up for this event. `settings.set` creates it." } },
@@ -177,15 +183,7 @@ export const judgingSettings = resource({
     set: action({
       description: "Create or replace settings. Creating is how an event's judging is initialized; the admin code is set out-of-band (see the service README).",
       auth: "judgingAdmin",
-      input: {
-        eventName: str({ description: "Display name." }),
-        phase: oneOf(["setup", "prelim", "finals", "closed"], { description: "Phase." }),
-        perTeamJudges: int({ description: "Judges per team for auto-assign." }),
-        finalsTopN: int({ description: "Default number of finalists." }),
-        finalsTeamIds: list(str({ description: "Team id." }), { description: "Finalist teams." }),
-        finalsJudgeIds: list(str({ description: "Judge id." }), { description: "Finals judges." }),
-        resultsPublic: bool({ description: "Teams may see results." }),
-      },
+      input: settingsFields,
       output: ref(JudgingSettings, { description: "The stored settings." }),
       route: { method: "PUT", path: `${base}/settings` },
     }),
@@ -275,11 +273,11 @@ export const judgingTeams = resource({
       route: { method: "GET", path: `${base}/teams/{id}` },
     }),
     update: action({
-      description: "Replace the editable fields. A team's own code may update its own team (submission page); admins may update any.",
+      description: "Replace the editable fields. A team's own code may update its own team while the phase is `submission` and submissions are not locked; admins may update any team at any time.",
       auth: "judgingCode",
       input: teamFields,
       output: ref(JudgingTeam, { description: "The updated team." }),
-      errors: { TeamNotFound: { status: 404, description: "No such team." }, Forbidden: { status: 403, description: "A team code tried to edit a different team." } },
+      errors: { TeamNotFound: { status: 404, description: "No such team." }, Forbidden: { status: 403, description: "A team code tried to edit a different team." }, SubmissionsLocked: { status: 409, description: "Phase is past `submission` or `lockSubmissions` is on." } },
       route: { method: "PUT", path: `${base}/teams/{id}` },
     }),
     delete: action({
@@ -369,7 +367,7 @@ export const reviews = resource({
   key: { id: str({ description: "Review id." }) },
   collection: {
     list: action({
-      description: "Reviews, filtered. Judges see all reviews; a team code sees only its own team's reviews, and only when `resultsPublic`. Admins see everything.",
+      description: "Reviews, filtered. Admins see everything. Judges see everything when `allowJudgeSeeOthers`, else only their own. A team code sees only its own team's reviews, and only when `showTeamFeedback`.",
       auth: "judgingCode",
       input: {
         round: oneOf(["prelim", "finals"], { optional: true, description: "Restrict to a round." }),
@@ -381,7 +379,7 @@ export const reviews = resource({
       route: { method: "GET", path: `${base}/reviews`, query: ["round", "teamId", "judgeId"] },
     }),
     submit: action({
-      description: "Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finals teams.",
+      description: "Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finalist teams.",
       auth: "judge",
       input: {
         teamId: str({ description: "Team being scored." }),
@@ -392,7 +390,7 @@ export const reviews = resource({
       errors: {
         TeamNotFound: { status: 404, description: "No such team." },
         InvalidScores: { status: 400, description: "A criterion is missing, extra, or out of range." },
-        PhaseClosed: { status: 409, description: "The phase is `setup` or `closed`, or this judge is not a finals judge / team is not a finalist." },
+        PhaseClosed: { status: 409, description: "The phase is `submission` or `closed`, or this judge is not a finals judge / team is not a finalist." },
       },
       route: { method: "POST", path: `${base}/reviews` },
     }),

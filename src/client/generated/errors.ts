@@ -58,6 +58,11 @@ export class ForbiddenError extends BtError {
   override readonly name = "ForbiddenError";
 }
 
+/** Phase is past `submission` or `lockSubmissions` is on. */
+export class SubmissionsLockedError extends BtError {
+  override readonly name = "SubmissionsLockedError";
+}
+
 /** There are no non-admin judges to assign. */
 export class NoJudgesError extends BtError {
   override readonly name = "NoJudgesError";
@@ -68,7 +73,7 @@ export class JudgeNotFoundError extends BtError {
   override readonly name = "JudgeNotFoundError";
 }
 
-/** The phase is `setup` or `closed`, or this judge is not a finals judge / team is not a finalist. */
+/** The phase is `submission` or `closed`, or this judge is not a finals judge / team is not a finalist. */
 export class PhaseClosedError extends BtError {
   override readonly name = "PhaseClosedError";
 }

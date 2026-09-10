@@ -90,7 +90,7 @@ export const routes: readonly RouteMeta[] = [
   {
     key: "judging.team.update", method: "teamUpdate", http: "PUT", path: "/judging/{eventID}/{year}/teams/{id}", query: [],
     auth: "judgingCode", paramKinds: {"eventID":"string","year":"integer","id":"string"}, scopeFields: ["eventID","year"],
-    input: S.JudgingTeamUpdateWireSchema, output: S.JudgingTeamUpdateOutputSchema, errors: {"TeamNotFound":404,"Forbidden":403},
+    input: S.JudgingTeamUpdateWireSchema, output: S.JudgingTeamUpdateOutputSchema, errors: {"TeamNotFound":404,"Forbidden":403,"SubmissionsLocked":409},
   },
   {
     key: "judging.team.delete", method: "teamDelete", http: "DELETE", path: "/judging/{eventID}/{year}/teams/{id}", query: [],
@@ -184,7 +184,7 @@ export interface Impl extends BaseImpl<Scope> {
    */
   sessionMe(ctx: Ctx<Scope>, input: S.JudgingSessionMeWire): Promise<S.JudgingSessionMeOutput>;
   /**
-   * Current settings. Public so the landing page can show the phase before login. `finalsJudgeIds` and `finalsTeamIds` are included.
+   * Current settings. Public so the landing page can show the phase and event name before login.
    * 
    * Auth: `public`. May throw: EventNotFound.
    */
@@ -226,9 +226,9 @@ export interface Impl extends BaseImpl<Scope> {
    */
   teamGet(ctx: Ctx<Scope>, input: S.JudgingTeamGetWire): Promise<S.JudgingTeamGetOutput>;
   /**
-   * Replace the editable fields. A team's own code may update its own team (submission page); admins may update any.
+   * Replace the editable fields. A team's own code may update its own team while the phase is `submission` and submissions are not locked; admins may update any team at any time.
    * 
-   * Auth: `judgingCode`. May throw: TeamNotFound, Forbidden.
+   * Auth: `judgingCode`. May throw: TeamNotFound, Forbidden, SubmissionsLocked.
    */
   teamUpdate(ctx: Ctx<Scope>, input: S.JudgingTeamUpdateWire): Promise<S.JudgingTeamUpdateOutput>;
   /**
@@ -274,13 +274,13 @@ export interface Impl extends BaseImpl<Scope> {
    */
   judgeDelete(ctx: Ctx<Scope>, input: S.JudgingJudgeDeleteWire): Promise<S.JudgingJudgeDeleteOutput>;
   /**
-   * Reviews, filtered. Judges see all reviews; a team code sees only its own team's reviews, and only when `resultsPublic`. Admins see everything.
+   * Reviews, filtered. Admins see everything. Judges see everything when `allowJudgeSeeOthers`, else only their own. A team code sees only its own team's reviews, and only when `showTeamFeedback`.
    * 
    * Auth: `judgingCode`. May throw: Forbidden.
    */
   reviewsList(ctx: Ctx<Scope>, input: S.JudgingReviewsListWire): Promise<S.JudgingReviewsListOutput>;
   /**
-   * Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finals teams.
+   * Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finalist teams.
    * 
    * Auth: `judge`. May throw: TeamNotFound, InvalidScores, PhaseClosed.
    */

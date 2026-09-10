@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createHandler, ActionError, type Impl } from "../src/server/generated/judging.js";
 
-const settings = { eventName: "HH", phase: "prelim" as const, perTeamJudges: 2, finalsTopN: 5, finalsTeamIds: [], finalsJudgeIds: [], resultsPublic: false, updatedAt: "t" };
+const settings = { eventName: "HH", phase: "prelim" as const, perTeamJudges: 2, finalsTopN: 5, finalsTeamIds: [], finalsJudgeIds: [], showTeamFeedback: false, allowJudgeSeeOthers: true, anonymizeTeams: false, lockSubmissions: false, maxImages: 10, updatedAt: "t" };
 const team = { id: "t1", name: "Alpha", members: ["a"], imageUrls: [], createdAt: "t" };
 
 // A stub: only what the tests exercise. The real impl lives in serverless-biztechapp/services/judging.
@@ -101,7 +101,7 @@ describe("class-based impl", () => {
     class Impl2 {
       private readonly name = "HH";
       async authenticate() { return null; }
-      async settingsGet() { return { eventName: this.name, phase: "prelim" as const, perTeamJudges: 1, finalsTopN: 1, finalsTeamIds: [], finalsJudgeIds: [], resultsPublic: false, updatedAt: "t" }; }
+      async settingsGet() { return { ...settings, eventName: this.name }; }
     }
     const h = createHandler(new Impl2() as unknown as Impl, () => {});
     const r = await h({ httpMethod: "GET", path: "/judging/x/2027/settings", headers: {}, requestContext: { requestId: "r" } });

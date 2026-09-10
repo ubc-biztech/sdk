@@ -56,7 +56,7 @@ One team. `code` only for `judgingAdmin`.
 
 ## `bt.judging(eventID, year).team(id).update(input)`
 
-Replace the editable fields. A team's own code may update its own team (submission page); admins may update any.
+Replace the editable fields. A team's own code may update its own team while the phase is `submission` and submissions are not locked; admins may update any team at any time.
 
 - **Auth:** `judgingCode`
 - **Route:** `PUT /judging/{eventID}/{year}/teams/{id}`
@@ -80,6 +80,7 @@ Replace the editable fields. A team's own code may update its own team (submissi
 |---|---|---|
 | `TeamNotFoundError` | 404 | No such team. |
 | `ForbiddenError` | 403 | A team code tried to edit a different team. |
+| `SubmissionsLockedError` | 409 | Phase is past `submission` or `lockSubmissions` is on. |
 
 ## `bt.judging(eventID, year).team(id).delete()`
 

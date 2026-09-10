@@ -6,7 +6,7 @@ Scoped under `bt.judging(eventID, year)`: One event's judging. Keyed like Event:
 
 ## `bt.judging(eventID, year).settings.get()`
 
-Current settings. Public so the landing page can show the phase before login. `finalsJudgeIds` and `finalsTeamIds` are included.
+Current settings. Public so the landing page can show the phase and event name before login.
 
 - **Auth:** `public`
 - **Route:** `GET /judging/{eventID}/{year}/settings`
@@ -30,13 +30,17 @@ Create or replace settings. Creating is how an event's judging is initialized; t
 
 | Field | Type | Description |
 |---|---|---|
-| `eventName` | string | Display name. |
-| `phase` | enum | Phase. |
-| `perTeamJudges` | integer | Judges per team for auto-assign. |
-| `finalsTopN` | integer | Default number of finalists. |
-| `finalsTeamIds` | array | Finalist teams. |
-| `finalsJudgeIds` | array | Finals judges. |
-| `resultsPublic` | boolean | Teams may see results. |
+| `eventName` | string | Display name, e.g. `HelloHacks 2027`. |
+| `phase` | enum | `submission`: teams edit their entries, no judging. `prelim`: all judges score their assigned teams. `finals`: finals judges score finalist teams. `closed`: nothing changes; results may be shown. |
+| `perTeamJudges` | integer | How many judges auto-assign gives each team. |
+| `finalsTopN` | integer | How many prelim teams advance to finals by default. |
+| `finalsTeamIds` | array | Teams in the finals round. Empty until finals are set up. |
+| `finalsJudgeIds` | array | Judges who score finals. Empty until finals are set up. |
+| `showTeamFeedback` | boolean | Teams may see their own reviews and the leaderboard. |
+| `allowJudgeSeeOthers` | boolean | Judges may read other judges' reviews. When false, `reviews.list` returns a judge only their own. |
+| `anonymizeTeams` | boolean | Hide team names from judges (UI concern; the API still returns names to judges). |
+| `lockSubmissions` | boolean | Teams may no longer edit their entries, regardless of phase. |
+| `maxImages` | integer | Maximum screenshots per team. |
 
 **Output:** [JudgingSettings](./entities.md#judgingsettings) — The stored settings.
 
