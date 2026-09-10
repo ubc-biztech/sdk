@@ -17,7 +17,7 @@ describe("ontology", () => {
       entities: {},
       resources: {
         thing: {
-          singular: "thing", plural: "things", description: "d", key: { id: { kind: "string", description: "k" } },
+          singular: "thing", plural: "things", service: "legacy", description: "d", key: { id: { kind: "string", description: "k" } },
           collection: {},
           instance: {
             a: { description: "d", auth: "wizard", output: { kind: "json", description: "" }, input: { id: { kind: "string", description: "dup" } }, errors: {}, route: { method: "GET", path: "/x/{nope}" } },
@@ -29,7 +29,7 @@ describe("ontology", () => {
     const msg = (() => { try { validate(bad); return ""; } catch (e) { return String(e); } })();
     // Every message must say what is wrong AND what the options are / where to fix it.
     expect(msg).toMatch(/auth is "wizard" but the declared roles are "public"/);
-    expect(msg).toMatch(/input field "id" is already a key field.*bt\.thing\(id\)/);
+    expect(msg).toMatch(/input field "id" is already provided by the chain \(id\)/);
     expect(msg).toMatch(/route\.path has \{nope\} but no field named "nope" exists\. Available: id/);
     expect(msg).toMatch(/output: description is empty\. Say what the value means/);
     expect(msg).toMatch(/Fix them in the files named/);

@@ -41,7 +41,23 @@ export const ref = (entity: EntitySpec, o: Common): FieldSpec => ({ kind: "ref",
 
 // ─── Roles ────────────────────────────────────────────────────────────
 
-export type RoleSpec = { description: string };
+export type RoleSpec = {
+  description: string;
+  /** Roles this one satisfies. `judgingAdmin` implies `judge` means an admin may call judge-only actions. Transitive. */
+  implies?: readonly string[];
+};
+
+/** Every role `role` satisfies, including itself, following `implies` transitively. */
+export function rolesSatisfiedBy(roles: Roles, role: string): Set<string> {
+  const out = new Set<string>();
+  const walk = (r: string) => {
+    if (out.has(r)) return;
+    out.add(r);
+    for (const i of roles[r]?.implies ?? []) walk(i);
+  };
+  walk(role);
+  return out;
+}
 export type Roles = Record<string, RoleSpec>;
 
 // ─── Entities ─────────────────────────────────────────────────────────
@@ -124,6 +140,18 @@ export type ResourceSpec = {
   description: string;
   /** The entity an instance represents, if any. Documentation only. */
   entity?: string;
+  /**
+   * Groups this resource under a keyed prefix: `bt.<scope.name>(...scope.key).<plural>…`.
+   * Every action's route may use the scope's key fields as path params. Resources that
+   * share a scope name must declare identical scope keys.
+   */
+  scope?: { name: string; key: Fields; description: string };
+  /**
+   * Which backend service serves this resource. `"legacy"` (default) means hand-written
+   * handlers in serverless-biztechapp that the SDK merely calls. Any other name means the
+   * SDK also generates that service's router and implementation contract.
+   */
+  service: string;
   /** Ordered: becomes the positional parameters of `bt.<singular>(...)`. */
   key: Fields;
   collection: Record<string, ActionSpec>;
@@ -136,6 +164,8 @@ export function resource(spec: {
   plural?: string;
   description: string;
   entity?: EntitySpec;
+  scope?: { name: string; key: Fields; description: string };
+  service?: string;
   key?: Fields;
   collection?: Record<string, ActionSpec>;
   instance?: Record<string, ActionSpec>;
@@ -146,6 +176,8 @@ export function resource(spec: {
     plural: spec.plural,
     description: spec.description,
     entity: spec.entity?.name,
+    scope: spec.scope,
+    service: spec.service ?? "legacy",
     key: spec.key ?? {},
     collection: spec.collection ?? {},
     instance: spec.instance ?? {},
@@ -163,24 +195,36 @@ export type Ontology = {
 
 /** Every action in the ontology with its full key, resource, and merged input (key + own). */
 export type FlatAction = {
+  /** `[scope.]<plural|singular>.<name>` */
   key: string;
   resource: ResourceSpec;
   level: "collection" | "instance";
   name: string;
   spec: ActionSpec;
-  /** Resource key fields (instance only) followed by the action's own input. */
+  /** Scope key, then resource key (instance only), then the action's own input. */
   fullInput: Fields;
+  /** Fields that arrive positionally through the chain rather than in `input`. */
+  chainFields: Fields;
 };
 
 export function flatten(o: Ontology): FlatAction[] {
   const out: FlatAction[] = [];
   for (const r of Object.values(o.resources)) {
+    const prefix = r.scope ? `${r.scope.name}.` : "";
+    const scopeKey = r.scope?.key ?? {};
     for (const [name, spec] of Object.entries(r.collection))
-      out.push({ key: `${r.plural ?? r.singular}.${name}`, resource: r, level: "collection", name, spec, fullInput: { ...(spec.input ?? {}) } });
+      out.push({ key: `${prefix}${r.plural ?? r.singular}.${name}`, resource: r, level: "collection", name, spec, chainFields: { ...scopeKey }, fullInput: { ...scopeKey, ...(spec.input ?? {}) } });
     for (const [name, spec] of Object.entries(r.instance))
-      out.push({ key: `${r.singular}.${name}`, resource: r, level: "instance", name, spec, fullInput: { ...r.key, ...(spec.input ?? {}) } });
+      out.push({ key: `${prefix}${r.singular}.${name}`, resource: r, level: "instance", name, spec, chainFields: { ...scopeKey, ...r.key }, fullInput: { ...scopeKey, ...r.key, ...(spec.input ?? {}) } });
   }
   return out;
+}
+
+/** Actions served by a generated service, grouped by service name. */
+export function byService(o: Ontology): Map<string, FlatAction[]> {
+  const m = new Map<string, FlatAction[]>();
+  for (const a of flatten(o)) if (a.resource.service !== "legacy") m.set(a.resource.service, [...(m.get(a.resource.service) ?? []), a]);
+  return m;
 }
 
 /**
@@ -209,9 +253,8 @@ export function validate(o: Ontology): void {
     if (/^\/TODO/.test(s.route.path) || s.route.path.includes("/TODO")) problems.push(`${at}: route.path is still "${s.route.path}". Use the exact path from the service's serverless.yml.`);
     if (!(s.auth in o.roles))
       problems.push(`${at}: auth is "${s.auth}" but the declared roles are ${roleList}. Pick one, or add the role in src/ontology/roles.ts (that is a decision recorded in the RFC, not a local fix).`);
-    if (a.level === "instance")
-      for (const k of Object.keys(s.input ?? {}))
-        if (k in a.resource.key) problems.push(`${at}: input field "${k}" is already a key field of the resource. Remove it from input; the caller passes it as bt.${a.resource.singular}(${Object.keys(a.resource.key).join(", ")}).`);
+    for (const k of Object.keys(s.input ?? {}))
+      if (k in a.chainFields) problems.push(`${at}: input field "${k}" is already provided by the chain (${Object.keys(a.chainFields).join(", ")}). Remove it from input.`);
     const pathParams = [...s.route.path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!);
     const available = Object.keys(a.fullInput);
     for (const p of pathParams) {
@@ -233,8 +276,30 @@ export function validate(o: Ontology): void {
       else if (e.status < 400) problems.push(`${at}: error ${en} has status ${e.status}; errors must be 4xx or 5xx.`);
     }
   }
+  const scopes = new Map<string, string>();
+  const topNames = new Map<string, string>();
+  const claim = (name: string, by: string) => {
+    const prev = topNames.get(name);
+    if (prev) problems.push(`bt.${name} is claimed twice: by ${prev} and by ${by}. Rename one (singular, plural, or scope name).`);
+    else topNames.set(name, by);
+  };
   for (const [rk, r] of Object.entries(o.resources)) {
-    if (rk !== r.singular) problems.push(`src/ontology/index.ts: resources.${rk} has singular "${r.singular}". The key must equal the singular; write \`${r.singular}: …\`.`);
+    if (!r.scope && rk !== r.singular) problems.push(`src/ontology/index.ts: resources.${rk} has singular "${r.singular}". For unscoped resources the key must equal the singular; write \`${r.singular}: …\`.`);
+    if (!r.scope) {
+      claim(r.singular, `resource "${r.singular}"`);
+      if (r.plural) claim(r.plural, `resource "${r.singular}"`);
+    } else {
+      const inScope = Object.values(o.resources).filter((x) => x.scope?.name === r.scope!.name && x !== r);
+      for (const x of inScope) if (x.singular === r.singular || (r.plural && x.plural === r.plural)) problems.push(`scope "${r.scope.name}" has two resources named "${r.singular}"/"${r.plural}". Rename one.`);
+    }
+    if (r.scope) {
+      const sig = JSON.stringify(Object.entries(r.scope.key).map(([k, f]) => [k, f.kind]));
+      const prev = scopes.get(r.scope.name);
+      if (prev && prev !== sig) problems.push(`${file(r)}: scope "${r.scope.name}" declares different key fields than another resource using the same scope. All resources in a scope must share one \`scope\` object; export it from one file and import it.`);
+      scopes.set(r.scope.name, sig);
+      if (!prev) claim(r.scope.name, `scope "${r.scope.name}"`);
+      for (const k of Object.keys(r.key)) if (k in r.scope.key) problems.push(`${file(r)}: key field "${k}" is already a scope key field.`);
+    }
     if (r.entity && !(r.entity in o.entities)) problems.push(`${file(r)}: entity "${r.entity}" is not in src/ontology/index.ts \`entities\`. Add it there.`);
     if (Object.keys(r.collection).length && !r.plural) problems.push(`${file(r)}: has collection actions but no \`plural\`. Add plural: "…" (it becomes bt.<plural>).`);
     if (!r.description.trim()) problems.push(`${file(r)}: description is empty.`);
@@ -246,11 +311,13 @@ export function validate(o: Ontology): void {
       if (lk in r.instance) problems.push(`${atl}: a link and an instance action are both called "${lk}". Rename one.`);
       for (const [inF, keyF] of Object.entries(l.map)) {
         if (target && !target.fullInput[inF]) problems.push(`${atl}: map has "${inF}" but ${l.via} has no such input. Its inputs: ${Object.keys(target.fullInput).join(", ") || "(none)"}.`);
-        if (!r.key[keyF]) problems.push(`${atl}: map reads "${keyF}" but the key fields are ${Object.keys(r.key).join(", ") || "(none)"}. A link can only use key fields, because that is all the chain knows.`);
+        const chainKeys = { ...(r.scope?.key ?? {}), ...r.key };
+        if (!chainKeys[keyF]) problems.push(`${atl}: map reads "${keyF}" but the chain only knows ${Object.keys(chainKeys).join(", ") || "(none)"}. A link can only use scope and key fields.`);
       }
       if (target) for (const [inF, f] of Object.entries(target.fullInput)) if (!f.optional && !(inF in l.map)) problems.push(`${atl}: ${l.via} requires "${inF}" but map does not provide it. Add \`${inF}: "<key field>"\` to map.`);
     }
   }
+  for (const [name, r] of Object.entries(o.roles)) for (const i of r.implies ?? []) if (!(i in o.roles)) problems.push(`src/ontology/roles.ts: role ${name} implies "${i}", which is not a role. Declared: ${roleList}.`);
   for (const [name, e] of Object.entries(o.entities)) {
     if (e.name !== name) problems.push(`src/ontology/index.ts: entities.${name} has name "${e.name}". The key must equal the name.`);
     if (!e.description.trim()) problems.push(`entity ${name}: description is empty.`);

@@ -68,21 +68,21 @@ const meta = {
     key: "team.assignJudges", method: "PUT", path: "/team/judge/currentTeam/{id}", query: [], fixedQuery: {},
     auth: "public", input: S.TeamAssignJudgesWireSchema, output: S.TeamAssignJudgesOutputSchema, errors: { 409: E.AllJudgesDoneError },
   },
-  "judge.currentTeam": {
-    key: "judge.currentTeam", method: "GET", path: "/team/judge/currentTeamID/{judgeID}", query: [], fixedQuery: {},
-    auth: "public", input: S.JudgeCurrentTeamWireSchema, output: S.JudgeCurrentTeamOutputSchema, errors: {  },
+  "legacyJudge.currentTeam": {
+    key: "legacyJudge.currentTeam", method: "GET", path: "/team/judge/currentTeamID/{judgeID}", query: [], fixedQuery: {},
+    auth: "public", input: S.LegacyJudgeCurrentTeamWireSchema, output: S.LegacyJudgeCurrentTeamOutputSchema, errors: {  },
   },
-  "judge.submissions": {
-    key: "judge.submissions", method: "GET", path: "/team/judge/feedback/{judgeID}", query: [], fixedQuery: {},
-    auth: "public", input: S.JudgeSubmissionsWireSchema, output: S.JudgeSubmissionsOutputSchema, errors: {  },
+  "legacyJudge.submissions": {
+    key: "legacyJudge.submissions", method: "GET", path: "/team/judge/feedback/{judgeID}", query: [], fixedQuery: {},
+    auth: "public", input: S.LegacyJudgeSubmissionsWireSchema, output: S.LegacyJudgeSubmissionsOutputSchema, errors: {  },
   },
-  "judge.submit": {
-    key: "judge.submit", method: "POST", path: "/team/judge/feedback", query: [], fixedQuery: {},
-    auth: "public", input: S.JudgeSubmitWireSchema, output: S.JudgeSubmitOutputSchema, errors: { 400: E.InvalidScoresError, 409: E.NotAJudgeError },
+  "legacyJudge.submit": {
+    key: "legacyJudge.submit", method: "POST", path: "/team/judge/feedback", query: [], fixedQuery: {},
+    auth: "public", input: S.LegacyJudgeSubmitWireSchema, output: S.LegacyJudgeSubmitOutputSchema, errors: { 400: E.InvalidScoresError, 409: E.NotAJudgeError },
   },
-  "judge.updateSubmission": {
-    key: "judge.updateSubmission", method: "PUT", path: "/team/judge/feedback", query: [], fixedQuery: {},
-    auth: "public", input: S.JudgeUpdateSubmissionWireSchema, output: S.JudgeUpdateSubmissionOutputSchema, errors: {  },
+  "legacyJudge.updateSubmission": {
+    key: "legacyJudge.updateSubmission", method: "PUT", path: "/team/judge/feedback", query: [], fixedQuery: {},
+    auth: "public", input: S.LegacyJudgeUpdateSubmissionWireSchema, output: S.LegacyJudgeUpdateSubmissionOutputSchema, errors: {  },
   },
   "judgingRound.get": {
     key: "judgingRound.get", method: "GET", path: "/team/round", query: [], fixedQuery: {},
@@ -92,11 +92,107 @@ const meta = {
     key: "judgingRound.set", method: "PUT", path: "/team/round/{round}", query: [], fixedQuery: {},
     auth: "public", input: S.JudgingRoundSetWireSchema, output: S.JudgingRoundSetOutputSchema, errors: {  },
   },
+  "judging.session.login": {
+    key: "judging.session.login", method: "POST", path: "/judging/{eventID}/{year}/session/login", query: [], fixedQuery: {},
+    auth: "public", input: S.JudgingSessionLoginWireSchema, output: S.JudgingSessionLoginOutputSchema, errors: { 404: E.UnknownCodeError },
+  },
+  "judging.session.me": {
+    key: "judging.session.me", method: "GET", path: "/judging/{eventID}/{year}/session", query: [], fixedQuery: {},
+    auth: "judgingCode", input: S.JudgingSessionMeWireSchema, output: S.JudgingSessionMeOutputSchema, errors: {  },
+  },
+  "judging.settings.get": {
+    key: "judging.settings.get", method: "GET", path: "/judging/{eventID}/{year}/settings", query: [], fixedQuery: {},
+    auth: "public", input: S.JudgingSettingsGetWireSchema, output: S.JudgingSettingsGetOutputSchema, errors: { 404: E.EventNotFoundError },
+  },
+  "judging.settings.set": {
+    key: "judging.settings.set", method: "PUT", path: "/judging/{eventID}/{year}/settings", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingSettingsSetWireSchema, output: S.JudgingSettingsSetOutputSchema, errors: {  },
+  },
+  "judging.rubric.get": {
+    key: "judging.rubric.get", method: "GET", path: "/judging/{eventID}/{year}/rubric", query: [], fixedQuery: {},
+    auth: "judgingCode", input: S.JudgingRubricGetWireSchema, output: S.JudgingRubricGetOutputSchema, errors: { 404: E.RubricNotFoundError },
+  },
+  "judging.rubric.set": {
+    key: "judging.rubric.set", method: "PUT", path: "/judging/{eventID}/{year}/rubric", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingRubricSetWireSchema, output: S.JudgingRubricSetOutputSchema, errors: { 400: E.InvalidRubricError },
+  },
+  "judging.teams.list": {
+    key: "judging.teams.list", method: "GET", path: "/judging/{eventID}/{year}/teams", query: [], fixedQuery: {},
+    auth: "judgingCode", input: S.JudgingTeamsListWireSchema, output: S.JudgingTeamsListOutputSchema, errors: {  },
+  },
+  "judging.teams.create": {
+    key: "judging.teams.create", method: "POST", path: "/judging/{eventID}/{year}/teams", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingTeamsCreateWireSchema, output: S.JudgingTeamsCreateOutputSchema, errors: {  },
+  },
+  "judging.team.get": {
+    key: "judging.team.get", method: "GET", path: "/judging/{eventID}/{year}/teams/{id}", query: [], fixedQuery: {},
+    auth: "judgingCode", input: S.JudgingTeamGetWireSchema, output: S.JudgingTeamGetOutputSchema, errors: { 404: E.TeamNotFoundError },
+  },
+  "judging.team.update": {
+    key: "judging.team.update", method: "PUT", path: "/judging/{eventID}/{year}/teams/{id}", query: [], fixedQuery: {},
+    auth: "judgingCode", input: S.JudgingTeamUpdateWireSchema, output: S.JudgingTeamUpdateOutputSchema, errors: { 404: E.TeamNotFoundError, 403: E.ForbiddenError },
+  },
+  "judging.team.delete": {
+    key: "judging.team.delete", method: "DELETE", path: "/judging/{eventID}/{year}/teams/{id}", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingTeamDeleteWireSchema, output: S.JudgingTeamDeleteOutputSchema, errors: { 404: E.TeamNotFoundError },
+  },
+  "judging.judges.list": {
+    key: "judging.judges.list", method: "GET", path: "/judging/{eventID}/{year}/judges", query: [], fixedQuery: {},
+    auth: "judge", input: S.JudgingJudgesListWireSchema, output: S.JudgingJudgesListOutputSchema, errors: {  },
+  },
+  "judging.judges.create": {
+    key: "judging.judges.create", method: "POST", path: "/judging/{eventID}/{year}/judges", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingJudgesCreateWireSchema, output: S.JudgingJudgesCreateOutputSchema, errors: {  },
+  },
+  "judging.judges.autoAssign": {
+    key: "judging.judges.autoAssign", method: "POST", path: "/judging/{eventID}/{year}/judges/auto-assign", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingJudgesAutoAssignWireSchema, output: S.JudgingJudgesAutoAssignOutputSchema, errors: { 409: E.NoJudgesError },
+  },
+  "judging.judge.get": {
+    key: "judging.judge.get", method: "GET", path: "/judging/{eventID}/{year}/judges/{id}", query: [], fixedQuery: {},
+    auth: "judge", input: S.JudgingJudgeGetWireSchema, output: S.JudgingJudgeGetOutputSchema, errors: { 404: E.JudgeNotFoundError },
+  },
+  "judging.judge.update": {
+    key: "judging.judge.update", method: "PATCH", path: "/judging/{eventID}/{year}/judges/{id}", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingJudgeUpdateWireSchema, output: S.JudgingJudgeUpdateOutputSchema, errors: { 404: E.JudgeNotFoundError },
+  },
+  "judging.judge.delete": {
+    key: "judging.judge.delete", method: "DELETE", path: "/judging/{eventID}/{year}/judges/{id}", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingJudgeDeleteWireSchema, output: S.JudgingJudgeDeleteOutputSchema, errors: { 404: E.JudgeNotFoundError },
+  },
+  "judging.reviews.list": {
+    key: "judging.reviews.list", method: "GET", path: "/judging/{eventID}/{year}/reviews", query: ["round","teamId","judgeId"], fixedQuery: {},
+    auth: "judgingCode", input: S.JudgingReviewsListWireSchema, output: S.JudgingReviewsListOutputSchema, errors: { 403: E.ForbiddenError },
+  },
+  "judging.reviews.submit": {
+    key: "judging.reviews.submit", method: "POST", path: "/judging/{eventID}/{year}/reviews", query: [], fixedQuery: {},
+    auth: "judge", input: S.JudgingReviewsSubmitWireSchema, output: S.JudgingReviewsSubmitOutputSchema, errors: { 404: E.TeamNotFoundError, 400: E.InvalidScoresError, 409: E.PhaseClosedError },
+  },
+  "judging.review.get": {
+    key: "judging.review.get", method: "GET", path: "/judging/{eventID}/{year}/reviews/{id}", query: [], fixedQuery: {},
+    auth: "judgingCode", input: S.JudgingReviewGetWireSchema, output: S.JudgingReviewGetOutputSchema, errors: { 404: E.ReviewNotFoundError, 403: E.ForbiddenError },
+  },
+  "judging.review.delete": {
+    key: "judging.review.delete", method: "DELETE", path: "/judging/{eventID}/{year}/reviews/{id}", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingReviewDeleteWireSchema, output: S.JudgingReviewDeleteOutputSchema, errors: { 404: E.ReviewNotFoundError },
+  },
+  "judging.links.list": {
+    key: "judging.links.list", method: "GET", path: "/judging/{eventID}/{year}/links", query: [], fixedQuery: {},
+    auth: "public", input: S.JudgingLinksListWireSchema, output: S.JudgingLinksListOutputSchema, errors: {  },
+  },
+  "judging.links.create": {
+    key: "judging.links.create", method: "POST", path: "/judging/{eventID}/{year}/links", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingLinksCreateWireSchema, output: S.JudgingLinksCreateOutputSchema, errors: {  },
+  },
+  "judging.link.delete": {
+    key: "judging.link.delete", method: "DELETE", path: "/judging/{eventID}/{year}/links/{id}", query: [], fixedQuery: {},
+    auth: "judgingAdmin", input: S.JudgingLinkDeleteWireSchema, output: S.JudgingLinkDeleteOutputSchema, errors: { 404: E.LinkNotFoundError },
+  },
 } satisfies Record<string, ActionMeta>;
 
 /**
  * Create a client. One per app, at startup. Every method is exactly one HTTP call to the BizTech API.
- * See AGENTS.md in this package for worked examples.
+ * See README.md in this package for worked examples.
  */
 export function createClient(config: ClientConfig) {
   const rt = new Runtime(config);
@@ -254,22 +350,22 @@ export function createClient(config: ClientConfig) {
        */
       assignJudges: (input: S.TeamAssignJudgesInput) => rt.call<S.TeamAssignJudgesOutput>(meta["team.assignJudges"], { id, ...input }),
     }),
-    /** A judge, identified by email. Judges are partner registrations for the event; there is no separate judge record. `bt.judge(email)`. */
-    judge: (judgeID: string) => ({
+    /** The teams service's original five-metric judging flow, keyed by judge email (judges are partner registrations). Superseded by `bt.judging(eventID, year)` for new events; kept for anything still on the old flow. `bt.legacyJudge(email)`. */
+    legacyJudge: (judgeID: string) => ({
       /**
        * The team this judge is currently assigned to.
        * 
        * Auth: `public` — No token required. Anyone on the internet.
        * Route: `GET /team/judge/currentTeamID/{judgeID}`
        */
-      currentTeam: () => rt.call<S.JudgeCurrentTeamOutput>(meta["judge.currentTeam"], { judgeID }),
+      currentTeam: () => rt.call<S.LegacyJudgeCurrentTeamOutput>(meta["legacyJudge.currentTeam"], { judgeID }),
       /**
        * Everything this judge has submitted, grouped by round. Note: with no submissions the backend currently returns HTTP 500 or 502 (it throws its 404 inside a try, and API Gateway reports the unhandled throw as 502). Catch ApiError with status >= 500 and treat it as empty until that is fixed.
        * 
        * Auth: `public` — No token required. Anyone on the internet.
        * Route: `GET /team/judge/feedback/{judgeID}`
        */
-      submissions: () => rt.call<S.JudgeSubmissionsOutput>(meta["judge.submissions"], { judgeID }),
+      submissions: () => rt.call<S.LegacyJudgeSubmissionsOutput>(meta["legacyJudge.submissions"], { judgeID }),
       /**
        * Submit scores for a team in the *current* round (the round is read server-side from `bt.judgingRound`). All five metrics must be non-zero; the backend treats 0 as missing. One submission per judge per team per round.
        * 
@@ -277,14 +373,14 @@ export function createClient(config: ClientConfig) {
        * Route: `POST /team/judge/feedback`
        * Throws: `InvalidScoresError` (400) A metric is missing or zero.; `NotAJudgeError` (409) No partner registration for this judge at this event, or already submitted for this team this round.
        */
-      submit: (input: S.JudgeSubmitInput) => rt.call<S.JudgeSubmitOutput>(meta["judge.submit"], { judgeID, ...input }),
+      submit: (input: S.LegacyJudgeSubmitInput) => rt.call<S.LegacyJudgeSubmitOutput>(meta["legacyJudge.submit"], { judgeID, ...input }),
       /**
        * Edit an existing submission for a team and round.
        * 
        * Auth: `public` — No token required. Anyone on the internet.
        * Route: `PUT /team/judge/feedback`
        */
-      updateSubmission: (input: S.JudgeUpdateSubmissionInput) => rt.call<S.JudgeUpdateSubmissionOutput>(meta["judge.updateSubmission"], { judgeID, ...input }),
+      updateSubmission: (input: S.LegacyJudgeUpdateSubmissionInput) => rt.call<S.LegacyJudgeUpdateSubmissionOutput>(meta["legacyJudge.updateSubmission"], { judgeID, ...input }),
     }),
     /** The single global judging round counter. A singleton: `bt.judgingRound.get()`. Note it is global, not per event. */
     judgingRound: {
@@ -303,6 +399,242 @@ export function createClient(config: ClientConfig) {
        */
       set: (input: S.JudgingRoundSetInput) => rt.call<S.JudgingRoundSetOutput>(meta["judgingRound.set"], input),
     },
+    /**
+     * One event's judging. Keyed like Event: (eventID, year).
+     * 
+     * Everything under `bt.judging(eventID, year)` is served by the generated `judging` service.
+     */
+    judging: (eventID: string, year: number) => ({
+      /** Code login. `bt.judging(e, y).session.login({ code })` returns who the code is; keep the code as the bearer token afterwards. */
+      session: {
+        /**
+         * Resolve a code to a role and identity. Public, rate-limited by the gateway. Returns 404 for an unknown code rather than 401 so the response does not distinguish 'wrong code' from 'no such event'.
+         * 
+         * Auth: `public` — No token required. Anyone on the internet.
+         * Route: `POST /judging/{eventID}/{year}/session/login`
+         * Throws: `UnknownCodeError` (404) No judge, team or admin code matches.
+         */
+        login: (input: S.JudgingSessionLoginInput) => rt.call<S.JudgingSessionLoginOutput>(meta["judging.session.login"], { eventID, year, ...input }),
+        /**
+         * Who the current bearer code is. Use on page load to restore a session.
+         * 
+         * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
+         * Route: `GET /judging/{eventID}/{year}/session`
+         */
+        me: () => rt.call<S.JudgingSessionMeOutput>(meta["judging.session.me"], { eventID, year }),
+      },
+      /** Event phase and configuration. A singleton per event. */
+      settings: {
+        /**
+         * Current settings. Public so the landing page can show the phase before login. `finalsJudgeIds` and `finalsTeamIds` are included.
+         * 
+         * Auth: `public` — No token required. Anyone on the internet.
+         * Route: `GET /judging/{eventID}/{year}/settings`
+         * Throws: `EventNotFoundError` (404) No judging has been set up for this event. `settings.set` creates it.
+         */
+        get: () => rt.call<S.JudgingSettingsGetOutput>(meta["judging.settings.get"], { eventID, year }),
+        /**
+         * Create or replace settings. Creating is how an event's judging is initialized; the admin code is set out-of-band (see the service README).
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `PUT /judging/{eventID}/{year}/settings`
+         */
+        set: (input: S.JudgingSettingsSetInput) => rt.call<S.JudgingSettingsSetOutput>(meta["judging.settings.set"], { eventID, year, ...input }),
+      },
+      /** The event's rubric. A singleton per event. */
+      rubric: {
+        /**
+         * The rubric. Judges need it to score; teams need it to read feedback.
+         * 
+         * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
+         * Route: `GET /judging/{eventID}/{year}/rubric`
+         * Throws: `RubricNotFoundError` (404) No rubric set yet.
+         */
+        get: () => rt.call<S.JudgingRubricGetOutput>(meta["judging.rubric.get"], { eventID, year }),
+        /**
+         * Create or replace the rubric. Existing reviews keep their scores keyed by old criterion ids; totals are not recomputed.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `PUT /judging/{eventID}/{year}/rubric`
+         * Throws: `InvalidRubricError` (400) No criteria, duplicate criterion ids, or a non-positive scale.
+         */
+        set: (input: S.JudgingRubricSetInput) => rt.call<S.JudgingRubricSetOutput>(meta["judging.rubric.set"], { eventID, year, ...input }),
+      },
+      /** Teams being judged. `bt.judging(e, y).teams.list()`, `bt.judging(e, y).team(id).get()`. */
+      teams: {
+        /**
+         * All teams, sorted by name. `code` is included only for `judgingAdmin` callers.
+         * 
+         * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
+         * Route: `GET /judging/{eventID}/{year}/teams`
+         */
+        list: () => rt.call<S.JudgingTeamsListOutput>(meta["judging.teams.list"], { eventID, year }),
+        /**
+         * Create a team. A login code is generated and returned.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `POST /judging/{eventID}/{year}/teams`
+         */
+        create: (input: S.JudgingTeamsCreateInput) => rt.call<S.JudgingTeamsCreateOutput>(meta["judging.teams.create"], { eventID, year, ...input }),
+      },
+      /** Teams being judged. `bt.judging(e, y).teams.list()`, `bt.judging(e, y).team(id).get()`. */
+      team: (id: string) => ({
+        /**
+         * One team. `code` only for `judgingAdmin`.
+         * 
+         * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
+         * Route: `GET /judging/{eventID}/{year}/teams/{id}`
+         * Throws: `TeamNotFoundError` (404) No such team.
+         */
+        get: () => rt.call<S.JudgingTeamGetOutput>(meta["judging.team.get"], { eventID, year, id }),
+        /**
+         * Replace the editable fields. A team's own code may update its own team (submission page); admins may update any.
+         * 
+         * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
+         * Route: `PUT /judging/{eventID}/{year}/teams/{id}`
+         * Throws: `TeamNotFoundError` (404) No such team.; `ForbiddenError` (403) A team code tried to edit a different team.
+         */
+        update: (input: S.JudgingTeamUpdateInput) => rt.call<S.JudgingTeamUpdateOutput>(meta["judging.team.update"], { eventID, year, id, ...input }),
+        /**
+         * Delete a team and its reviews.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `DELETE /judging/{eventID}/{year}/teams/{id}`
+         * Throws: `TeamNotFoundError` (404) No such team.
+         */
+        delete: () => rt.call<S.JudgingTeamDeleteOutput>(meta["judging.team.delete"], { eventID, year, id }),
+        /**
+         * Reviews of this team across rounds. Team codes see them only when results are public.
+         * 
+         * Link → `judging.reviews.list`. One HTTP call.
+         */
+        reviews: () => rt.call<S.JudgingReviewsListOutput>(meta["judging.reviews.list"], { eventID: eventID, year: year, teamId: id }),
+      }),
+      /** Judges. `bt.judging(e, y).judges.list()`, `bt.judging(e, y).judge(id).get()`. */
+      judges: {
+        /**
+         * All judges. `code` only for `judgingAdmin`.
+         * 
+         * Auth: `judge` — Bearer token is a judge code for the event.
+         * Route: `GET /judging/{eventID}/{year}/judges`
+         */
+        list: () => rt.call<S.JudgingJudgesListOutput>(meta["judging.judges.list"], { eventID, year }),
+        /**
+         * Create a judge. A login code is generated and returned.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `POST /judging/{eventID}/{year}/judges`
+         */
+        create: (input: S.JudgingJudgesCreateInput) => rt.call<S.JudgingJudgesCreateOutput>(meta["judging.judges.create"], { eventID, year, ...input }),
+        /**
+         * Round-robin every team to `perTeamJudges` non-admin judges, replacing all existing prelim assignments.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `POST /judging/{eventID}/{year}/judges/auto-assign`
+         * Throws: `NoJudgesError` (409) There are no non-admin judges to assign.
+         */
+        autoAssign: (input: S.JudgingJudgesAutoAssignInput = {}) => rt.call<S.JudgingJudgesAutoAssignOutput>(meta["judging.judges.autoAssign"], { eventID, year, ...input }),
+      },
+      /** Judges. `bt.judging(e, y).judges.list()`, `bt.judging(e, y).judge(id).get()`. */
+      judge: (id: string) => ({
+        /**
+         * One judge. `code` only for `judgingAdmin`.
+         * 
+         * Auth: `judge` — Bearer token is a judge code for the event.
+         * Route: `GET /judging/{eventID}/{year}/judges/{id}`
+         * Throws: `JudgeNotFoundError` (404) No such judge.
+         */
+        get: () => rt.call<S.JudgingJudgeGetOutput>(meta["judging.judge.get"], { eventID, year, id }),
+        /**
+         * Rename, toggle admin, or set assignments.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `PATCH /judging/{eventID}/{year}/judges/{id}`
+         * Throws: `JudgeNotFoundError` (404) No such judge.
+         */
+        update: (input: S.JudgingJudgeUpdateInput = {}) => rt.call<S.JudgingJudgeUpdateOutput>(meta["judging.judge.update"], { eventID, year, id, ...input }),
+        /**
+         * Delete a judge. Their reviews are kept.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `DELETE /judging/{eventID}/{year}/judges/{id}`
+         * Throws: `JudgeNotFoundError` (404) No such judge.
+         */
+        delete: () => rt.call<S.JudgingJudgeDeleteOutput>(meta["judging.judge.delete"], { eventID, year, id }),
+        /**
+         * Everything this judge has submitted.
+         * 
+         * Link → `judging.reviews.list`. One HTTP call.
+         */
+        reviews: () => rt.call<S.JudgingReviewsListOutput>(meta["judging.reviews.list"], { eventID: eventID, year: year, judgeId: id }),
+      }),
+      /** Scores. Judges submit with `reviews.submit`; everyone reads with `reviews.list`. */
+      reviews: {
+        /**
+         * Reviews, filtered. Judges see all reviews; a team code sees only its own team's reviews, and only when `resultsPublic`. Admins see everything.
+         * 
+         * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
+         * Route: `GET /judging/{eventID}/{year}/reviews`
+         * Throws: `ForbiddenError` (403) A team code asked for another team, or results are not public yet.
+         */
+        list: (input: S.JudgingReviewsListInput = {}) => rt.call<S.JudgingReviewsListOutput>(meta["judging.reviews.list"], { eventID, year, ...input }),
+        /**
+         * Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finals teams.
+         * 
+         * Auth: `judge` — Bearer token is a judge code for the event.
+         * Route: `POST /judging/{eventID}/{year}/reviews`
+         * Throws: `TeamNotFoundError` (404) No such team.; `InvalidScoresError` (400) A criterion is missing, extra, or out of range.; `PhaseClosedError` (409) The phase is `setup` or `closed`, or this judge is not a finals judge / team is not a finalist.
+         */
+        submit: (input: S.JudgingReviewsSubmitInput) => rt.call<S.JudgingReviewsSubmitOutput>(meta["judging.reviews.submit"], { eventID, year, ...input }),
+      },
+      /** Scores. Judges submit with `reviews.submit`; everyone reads with `reviews.list`. */
+      review: (id: string) => ({
+        /**
+         * One review.
+         * 
+         * Auth: `judgingCode` — Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job.
+         * Route: `GET /judging/{eventID}/{year}/reviews/{id}`
+         * Throws: `ReviewNotFoundError` (404) No such review.; `ForbiddenError` (403) Not visible to this caller.
+         */
+        get: () => rt.call<S.JudgingReviewGetOutput>(meta["judging.review.get"], { eventID, year, id }),
+        /**
+         * Delete a review.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `DELETE /judging/{eventID}/{year}/reviews/{id}`
+         * Throws: `ReviewNotFoundError` (404) No such review.
+         */
+        delete: () => rt.call<S.JudgingReviewDeleteOutput>(meta["judging.review.delete"], { eventID, year, id }),
+      }),
+      /** Home-page links. */
+      links: {
+        /**
+         * All links in order.
+         * 
+         * Auth: `public` — No token required. Anyone on the internet.
+         * Route: `GET /judging/{eventID}/{year}/links`
+         */
+        list: () => rt.call<S.JudgingLinksListOutput>(meta["judging.links.list"], { eventID, year }),
+        /**
+         * Add a link.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `POST /judging/{eventID}/{year}/links`
+         */
+        create: (input: S.JudgingLinksCreateInput) => rt.call<S.JudgingLinksCreateOutput>(meta["judging.links.create"], { eventID, year, ...input }),
+      },
+      /** Home-page links. */
+      link: (id: string) => ({
+        /**
+         * Remove a link.
+         * 
+         * Auth: `judgingAdmin` — Bearer token is the event's organizer code.
+         * Route: `DELETE /judging/{eventID}/{year}/links/{id}`
+         * Throws: `LinkNotFoundError` (404) No such link.
+         */
+        delete: () => rt.call<S.JudgingLinkDeleteOutput>(meta["judging.link.delete"], { eventID, year, id }),
+      }),
+    }),
   };
 }
 

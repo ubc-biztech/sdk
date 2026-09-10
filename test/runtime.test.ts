@@ -48,7 +48,7 @@ describe("chained client", () => {
   it("instance key that is not a path param goes into the body", async () => {
     const { calls, fetch } = fake(200, { message: "ok" });
     const bt = createClient({ baseUrl: "https://x", fetch });
-    await bt.judge("j@x.com").submit({ teamID: "t1", eventID: "hh", year: 2026, scores: { metric1: 1, metric2: 2, metric3: 3, metric4: 4, metric5: 5 } });
+    await bt.legacyJudge("j@x.com").submit({ teamID: "t1", eventID: "hh", year: 2026, scores: { metric1: 1, metric2: 2, metric3: 3, metric4: 4, metric5: 5 } });
     const body = JSON.parse(calls[0]!.init.body as string);
     expect(body.judgeID).toBe("j@x.com");
     expect(body.teamID).toBe("t1");
@@ -110,7 +110,33 @@ describe("chained client", () => {
   });
 
   it("accepts nullable fields", async () => {
-    const r = await createClient({ baseUrl: "https://x", fetch: fake(200, { message: "m", currentTeamID: "t", currentTeamName: null }).fetch }).judge("j").currentTeam();
+    const r = await createClient({ baseUrl: "https://x", fetch: fake(200, { message: "m", currentTeamID: "t", currentTeamName: null }).fetch }).legacyJudge("j").currentTeam();
     expect(r.currentTeamName).toBeNull();
+  });
+});
+
+describe("scoped resources", () => {
+  const ok = (body: unknown) => fake(200, body);
+  it("scope key flows into path params of every nested action", async () => {
+    const { calls, fetch } = ok({ eventName: "HH", phase: "prelim", perTeamJudges: 2, finalsTopN: 5, finalsTeamIds: [], finalsJudgeIds: [], resultsPublic: false, updatedAt: "t" });
+    await createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).settings.get();
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/settings");
+  });
+  it("scope key + resource key + input compose, with key fields kept out of the body", async () => {
+    const team = { id: "t1", name: "n", members: [], imageUrls: [], createdAt: "t" };
+    const { calls, fetch } = ok(team);
+    await createClient({ baseUrl: "https://x", fetch, getToken: () => "code" }).judging("hellohacks", 2027).team("t1").update({ name: "n", members: [] });
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/teams/t1");
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ name: "n", members: [] });
+  });
+  it("scoped links map scope and key fields onto the target's input", async () => {
+    const { calls, fetch } = ok([]);
+    await createClient({ baseUrl: "https://x", fetch, getToken: () => "code" }).judging("hellohacks", 2027).team("t1").reviews();
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/reviews?teamId=t1");
+  });
+  it("code roles require a token like any non-public action", async () => {
+    const { calls, fetch } = ok([]);
+    await expect(createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).teams.list()).rejects.toBeInstanceOf(NotAuthenticatedError);
+    expect(calls).toHaveLength(0);
   });
 });

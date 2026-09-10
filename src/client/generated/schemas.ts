@@ -348,6 +348,200 @@ export const NormalizedTeamScoreSchema: z.ZodType<NormalizedTeamScore> = z.objec
   })),
 });
 
+/** Per-event judging configuration and phase. One record per event. */
+export interface JudgingSettings {
+  /** Display name, e.g. `HelloHacks 2027`. */
+  eventName: string;
+  /** Where the event is. Judges can only submit in `prelim` and `finals`; results are public in `closed`. */
+  phase: "setup" | "prelim" | "finals" | "closed";
+  /** How many judges auto-assign gives each team. */
+  perTeamJudges: number;
+  /** How many prelim teams advance to finals by default. */
+  finalsTopN: number;
+  /** Teams in the finals round. Empty until finals are set up. */
+  finalsTeamIds: string[];
+  /** Judges who score finals. Empty until finals are set up. */
+  finalsJudgeIds: string[];
+  /** Teams may see their own feedback and the leaderboard. */
+  resultsPublic: boolean;
+  /** ISO-8601. */
+  updatedAt: string;
+}
+export const JudgingSettingsSchema: z.ZodType<JudgingSettings> = z.object({
+  eventName: z.string(),
+  phase: z.enum(["setup", "prelim", "finals", "closed"]),
+  perTeamJudges: z.number().int(),
+  finalsTopN: z.number().int(),
+  finalsTeamIds: z.array(z.string()),
+  finalsJudgeIds: z.array(z.string()),
+  resultsPublic: z.boolean(),
+  updatedAt: z.string(),
+});
+
+/** The scoring rubric for an event. Reviews are scored per criterion against this; totals are computed from it. */
+export interface Rubric {
+  /** Rubric name. */
+  name: string;
+  /** Highest score on each criterion, e.g. 5 or 10. */
+  scaleMax: number;
+  /** `points`: total is the sum of raw scores. `weighted`: each criterion is multiplied by its weight. */
+  scoreMode: "points" | "weighted";
+  /** Criteria in display order. */
+  criteria: Array<{
+    /** Stable id; the key in Review.scores. */
+    id: string;
+    /** Short name shown to judges. */
+    label: string;
+    /** Guidance shown under the label. */
+    description?: string;
+    /** Multiplier in `weighted` mode; 1 means neutral. */
+    weight: number;
+    /** Overrides scaleMax for this criterion. */
+    maxScore?: number;
+  }>;
+  /** ISO-8601. */
+  updatedAt: string;
+}
+export const RubricSchema: z.ZodType<Rubric> = z.object({
+  name: z.string(),
+  scaleMax: z.number().int(),
+  scoreMode: z.enum(["points", "weighted"]),
+  criteria: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    description: z.string().optional(),
+    weight: z.number(),
+    maxScore: z.number().int().optional(),
+  })),
+  updatedAt: z.string(),
+});
+
+/** A team being judged. Independent of the `Team` entity used by the main app; hackathon teams are created by organizers or self-registered with a code. */
+export interface JudgingTeam {
+  /** ULID, assigned on create. */
+  id: string;
+  /** Team name. */
+  name: string;
+  /** Member display names. */
+  members: string[];
+  /** Project pitch. Markdown-ish. */
+  description?: string;
+  /** Repository URL. */
+  github?: string;
+  /** Devpost URL. */
+  devpost?: string;
+  /** Screenshots. URLs only; upload is the client's concern for now. */
+  imageUrls: string[];
+  /** Login code for the team's own feedback page. Only returned to `judgingAdmin`. */
+  code?: string;
+  /** ISO-8601. */
+  createdAt: string;
+}
+export const JudgingTeamSchema: z.ZodType<JudgingTeam> = z.object({
+  id: z.string(),
+  name: z.string(),
+  members: z.array(z.string()),
+  description: z.string().optional(),
+  github: z.string().optional(),
+  devpost: z.string().optional(),
+  imageUrls: z.array(z.string()),
+  code: z.string().optional(),
+  createdAt: z.string(),
+});
+
+/** A judge for one event. Has no BizTech account; logs in with `code`. */
+export interface Judge {
+  /** ULID, assigned on create. */
+  id: string;
+  /** Display name, shown on reviews. */
+  name: string;
+  /** Login code. Only returned to `judgingAdmin`. */
+  code?: string;
+  /** This judge's code also grants `judgingAdmin`. */
+  isAdmin: boolean;
+  /** Teams this judge scores in prelims, in order. */
+  assignedTeamIds: string[];
+}
+export const JudgeSchema: z.ZodType<Judge> = z.object({
+  id: z.string(),
+  name: z.string(),
+  code: z.string().optional(),
+  isAdmin: z.boolean(),
+  assignedTeamIds: z.array(z.string()),
+});
+
+/** One judge's scores for one team in one round. Id is deterministic (`<round>__<teamId>__<judgeId>`) so a resubmit replaces rather than duplicates. */
+export interface Review {
+  /** `<round>__<teamId>__<judgeId>`. */
+  id: string;
+  /** Round the review belongs to. */
+  round: "prelim" | "finals";
+  /** JudgingTeam id. */
+  teamId: string;
+  /** Judge id. */
+  judgeId: string;
+  /** Judge display name at submission. */
+  judgeName: string;
+  /** Keyed by Rubric.criteria[].id. */
+  scores: Record<string, number>;
+  /** Written feedback. Empty string when none. */
+  feedback: string;
+  /** Sum of raw scores, computed server-side from the rubric at submission. */
+  total: number;
+  /** Sum of score × weight, computed server-side. */
+  weightedTotal: number;
+  /** ISO-8601. */
+  completedAt: string;
+}
+export const ReviewSchema: z.ZodType<Review> = z.object({
+  id: z.string(),
+  round: z.enum(["prelim", "finals"]),
+  teamId: z.string(),
+  judgeId: z.string(),
+  judgeName: z.string(),
+  scores: z.record(z.string(), z.number()),
+  feedback: z.string(),
+  total: z.number(),
+  weightedTotal: z.number(),
+  completedAt: z.string(),
+});
+
+/** A link shown on the portal home page (schedule, Discord, rules). */
+export interface JudgingLink {
+  /** ULID. */
+  id: string;
+  /** Link text. */
+  label: string;
+  /** Destination. */
+  url: string;
+  /** Sort key, ascending. */
+  order: number;
+}
+export const JudgingLinkSchema: z.ZodType<JudgingLink> = z.object({
+  id: z.string(),
+  label: z.string(),
+  url: z.string(),
+  order: z.number().int(),
+});
+
+/** Who a code belongs to. Returned by `session.login`; the code itself is then used as the bearer token. */
+export interface JudgingSession {
+  /** What the code grants. */
+  role: "judgingAdmin" | "judge" | "team";
+  /** Judge id or team id. For `judgingAdmin` codes that are not also a judge, the string `admin`. */
+  id: string;
+  /** Display name. */
+  name: string;
+  /** From JudgingSettings, so the client can render a header without a second call. */
+  eventName: string;
+}
+export const JudgingSessionSchema: z.ZodType<JudgingSession> = z.object({
+  role: z.enum(["judgingAdmin", "judge", "team"]),
+  id: z.string(),
+  name: z.string(),
+  eventName: z.string(),
+});
+
 // ─── Action inputs and outputs ───
 
 /** Input for `bt.events.list`. */
@@ -358,6 +552,8 @@ export interface EventsListInput {
 export const EventsListWireSchema = z.object({
   id: z.string().optional(),
 });
+/** Everything the server receives for `bt.events.list`: scope key, resource key, and input. */
+export type EventsListWire = z.infer<typeof EventsListWireSchema>;
 /** Output of `bt.events.list`. Events, ascending by startDate. */
 export type EventsListOutput = Event[];
 export const EventsListOutputSchema: z.ZodType<EventsListOutput> = z.array(z.lazy(() => EventSchema));
@@ -366,7 +562,9 @@ export const EventGetWireSchema = z.object({
   id: z.string(),
   year: z.number().int(),
 });
-/** Output of `bt.event(…).get`. The event. */
+/** Everything the server receives for `bt.event(id, year).get`: scope key, resource key, and input. */
+export type EventGetWire = z.infer<typeof EventGetWireSchema>;
+/** Output of `bt.event(id, year).get`. The event. */
 export type EventGetOutput = Event;
 export const EventGetOutputSchema: z.ZodType<EventGetOutput> = z.lazy(() => EventSchema);
 
@@ -374,7 +572,9 @@ export const EventCountsWireSchema = z.object({
   id: z.string(),
   year: z.number().int(),
 });
-/** Output of `bt.event(…).counts`. The tallies. */
+/** Everything the server receives for `bt.event(id, year).counts`: scope key, resource key, and input. */
+export type EventCountsWire = z.infer<typeof EventCountsWireSchema>;
+/** Output of `bt.event(id, year).counts`. The tallies. */
 export type EventCountsOutput = EventCounts;
 export const EventCountsOutputSchema: z.ZodType<EventCountsOutput> = z.lazy(() => EventCountsSchema);
 
@@ -392,20 +592,26 @@ export const RegistrationsListWireSchema = z.object({
   eventID: z.string().optional(),
   year: z.number().int().optional(),
 });
+/** Everything the server receives for `bt.registrations.list`: scope key, resource key, and input. */
+export type RegistrationsListWire = z.infer<typeof RegistrationsListWireSchema>;
 /** Output of `bt.registrations.list`. Matching registrations. Empty array when none. */
 export type RegistrationsListOutput = Registration[];
 export const RegistrationsListOutputSchema: z.ZodType<RegistrationsListOutput> = z.array(z.lazy(() => RegistrationSchema));
 
 export const MeGetWireSchema = z.object({
 });
-/** Output of `bt.me(…).get`. The caller. */
+/** Everything the server receives for `bt.me.get`: scope key, resource key, and input. */
+export type MeGetWire = z.infer<typeof MeGetWireSchema>;
+/** Output of `bt.me.get`. The caller. */
 export type MeGetOutput = User;
 export const MeGetOutputSchema: z.ZodType<MeGetOutput> = z.lazy(() => UserSchema);
 
 export const UserGetWireSchema = z.object({
   email: z.string(),
 });
-/** Output of `bt.user(…).get`. The user. */
+/** Everything the server receives for `bt.user(email).get`: scope key, resource key, and input. */
+export type UserGetWire = z.infer<typeof UserGetWireSchema>;
+/** Output of `bt.user(email).get`. The user. */
 export type UserGetOutput = User;
 export const UserGetOutputSchema: z.ZodType<UserGetOutput> = z.lazy(() => UserSchema);
 
@@ -420,12 +626,16 @@ export const TeamsListWireSchema = z.object({
   eventID: z.string(),
   year: z.number().int(),
 });
+/** Everything the server receives for `bt.teams.list`: scope key, resource key, and input. */
+export type TeamsListWire = z.infer<typeof TeamsListWireSchema>;
 /** Output of `bt.teams.list`. Teams for the event. */
 export type TeamsListOutput = Team[];
 export const TeamsListOutputSchema: z.ZodType<TeamsListOutput> = z.array(z.lazy(() => TeamSchema));
 
 export const TeamsScoresWireSchema = z.object({
 });
+/** Everything the server receives for `bt.teams.scores`: scope key, resource key, and input. */
+export type TeamsScoresWire = z.infer<typeof TeamsScoresWireSchema>;
 /** Output of `bt.teams.scores`. Aggregates, unordered. */
 export type TeamsScoresOutput = NormalizedTeamScore[];
 export const TeamsScoresOutputSchema: z.ZodType<TeamsScoresOutput> = z.array(z.lazy(() => NormalizedTeamScoreSchema));
@@ -444,6 +654,8 @@ export const TeamsForUserWireSchema = z.object({
   eventID: z.string(),
   year: z.number().int(),
 });
+/** Everything the server receives for `bt.teams.forUser`: scope key, resource key, and input. */
+export type TeamsForUserWire = z.infer<typeof TeamsForUserWireSchema>;
 /** Output of `bt.teams.forUser`. Wrapper around the team. */
 export type TeamsForUserOutput = {
   /** Confirmation. */
@@ -473,6 +685,8 @@ export const TeamsCreateWireSchema = z.object({
   year: z.number().int(),
   memberIDs: z.array(z.string()),
 });
+/** Everything the server receives for `bt.teams.create`: scope key, resource key, and input. */
+export type TeamsCreateWire = z.infer<typeof TeamsCreateWireSchema>;
 /** Output of `bt.teams.create`. Wrapper around the created team. */
 export type TeamsCreateOutput = {
   /** Confirmation. */
@@ -502,6 +716,8 @@ export const TeamsJoinWireSchema = z.object({
   year: z.number().int(),
   teamID: z.string(),
 });
+/** Everything the server receives for `bt.teams.join`: scope key, resource key, and input. */
+export type TeamsJoinWire = z.infer<typeof TeamsJoinWireSchema>;
 /** Output of `bt.teams.join`. Confirmation; `response` echoes the input. */
 export type TeamsJoinOutput = {
   /** Human-readable confirmation. */
@@ -525,6 +741,8 @@ export const TeamsLeaveWireSchema = z.object({
   eventID: z.string(),
   year: z.number().int(),
 });
+/** Everything the server receives for `bt.teams.leave`: scope key, resource key, and input. */
+export type TeamsLeaveWire = z.infer<typeof TeamsLeaveWireSchema>;
 /** Output of `bt.teams.leave`. Confirmation; `response` echoes the input. */
 export type TeamsLeaveOutput = {
   /** Human-readable confirmation. */
@@ -551,6 +769,8 @@ export const TeamsRenameWireSchema = z.object({
   year: z.number().int(),
   team_name: z.string(),
 });
+/** Everything the server receives for `bt.teams.rename`: scope key, resource key, and input. */
+export type TeamsRenameWire = z.infer<typeof TeamsRenameWireSchema>;
 /** Output of `bt.teams.rename`. Confirmation. */
 export type TeamsRenameOutput = {
   /** Human-readable confirmation. */
@@ -577,6 +797,8 @@ export const TeamsAddPointsWireSchema = z.object({
   year: z.number().int(),
   change_points: z.number().int(),
 });
+/** Everything the server receives for `bt.teams.addPoints`: scope key, resource key, and input. */
+export type TeamsAddPointsWire = z.infer<typeof TeamsAddPointsWireSchema>;
 /** Output of `bt.teams.addPoints`. New total. */
 export type TeamsAddPointsOutput = {
   /** Confirmation. */
@@ -592,7 +814,9 @@ export const TeamsAddPointsOutputSchema: z.ZodType<TeamsAddPointsOutput> = z.obj
 export const TeamFeedbackWireSchema = z.object({
   id: z.string(),
 });
-/** Output of `bt.team(…).feedback`. Submissions by round. */
+/** Everything the server receives for `bt.team(id).feedback`: scope key, resource key, and input. */
+export type TeamFeedbackWire = z.infer<typeof TeamFeedbackWireSchema>;
+/** Output of `bt.team(id).feedback`. Submissions by round. */
 export type TeamFeedbackOutput = {
   /** Confirmation. */
   message: string;
@@ -604,7 +828,7 @@ export const TeamFeedbackOutputSchema: z.ZodType<TeamFeedbackOutput> = z.object(
   scores: z.record(z.string(), z.array(z.lazy(() => JudgeSubmissionSchema))),
 });
 
-/** Input for `bt.team(…).assignJudges`. */
+/** Input for `bt.team(id).assignJudges`. */
 export interface TeamAssignJudgesInput {
   /** Judges to assign. */
   judgeIDs: string[];
@@ -613,7 +837,9 @@ export const TeamAssignJudgesWireSchema = z.object({
   id: z.string(),
   judgeIDs: z.array(z.string()),
 });
-/** Output of `bt.team(…).assignJudges`. Confirmation. */
+/** Everything the server receives for `bt.team(id).assignJudges`: scope key, resource key, and input. */
+export type TeamAssignJudgesWire = z.infer<typeof TeamAssignJudgesWireSchema>;
+/** Output of `bt.team(id).assignJudges`. Confirmation. */
 export type TeamAssignJudgesOutput = {
   /** Human-readable confirmation. */
   message: string;
@@ -622,11 +848,13 @@ export const TeamAssignJudgesOutputSchema: z.ZodType<TeamAssignJudgesOutput> = z
   message: z.string(),
 });
 
-export const JudgeCurrentTeamWireSchema = z.object({
+export const LegacyJudgeCurrentTeamWireSchema = z.object({
   judgeID: z.string(),
 });
-/** Output of `bt.judge(…).currentTeam`. Current assignment. */
-export type JudgeCurrentTeamOutput = {
+/** Everything the server receives for `bt.legacyJudge(judgeID).currentTeam`: scope key, resource key, and input. */
+export type LegacyJudgeCurrentTeamWire = z.infer<typeof LegacyJudgeCurrentTeamWireSchema>;
+/** Output of `bt.legacyJudge(judgeID).currentTeam`. Current assignment. */
+export type LegacyJudgeCurrentTeamOutput = {
   /** Confirmation. */
   message: string;
   /** Assigned team UUID. */
@@ -634,17 +862,19 @@ export type JudgeCurrentTeamOutput = {
   /** Team name, or null if the team record is missing. */
   currentTeamName: string | null;
 };
-export const JudgeCurrentTeamOutputSchema: z.ZodType<JudgeCurrentTeamOutput> = z.object({
+export const LegacyJudgeCurrentTeamOutputSchema: z.ZodType<LegacyJudgeCurrentTeamOutput> = z.object({
   message: z.string(),
   currentTeamID: z.string(),
   currentTeamName: z.string().nullable(),
 });
 
-export const JudgeSubmissionsWireSchema = z.object({
+export const LegacyJudgeSubmissionsWireSchema = z.object({
   judgeID: z.string(),
 });
-/** Output of `bt.judge(…).submissions`. Submissions by round. */
-export type JudgeSubmissionsOutput = {
+/** Everything the server receives for `bt.legacyJudge(judgeID).submissions`: scope key, resource key, and input. */
+export type LegacyJudgeSubmissionsWire = z.infer<typeof LegacyJudgeSubmissionsWireSchema>;
+/** Output of `bt.legacyJudge(judgeID).submissions`. Submissions by round. */
+export type LegacyJudgeSubmissionsOutput = {
   /** Confirmation. */
   message: string;
   /** Keyed by round. */
@@ -667,7 +897,7 @@ export type JudgeSubmissionsOutput = {
     createdAt?: string;
   }>>;
 };
-export const JudgeSubmissionsOutputSchema: z.ZodType<JudgeSubmissionsOutput> = z.object({
+export const LegacyJudgeSubmissionsOutputSchema: z.ZodType<LegacyJudgeSubmissionsOutput> = z.object({
   message: z.string(),
   scores: z.record(z.string(), z.array(z.object({
     round: z.string(),
@@ -681,8 +911,8 @@ export const JudgeSubmissionsOutputSchema: z.ZodType<JudgeSubmissionsOutput> = z
   }))),
 });
 
-/** Input for `bt.judge(…).submit`. */
-export interface JudgeSubmitInput {
+/** Input for `bt.legacyJudge(judgeID).submit`. */
+export interface LegacyJudgeSubmitInput {
   /** Team UUID. */
   teamID: string;
   /** Event id (slug). */
@@ -694,7 +924,7 @@ export interface JudgeSubmitInput {
   /** Written feedback; string or object keyed by criterion. */
   feedback?: unknown;
 }
-export const JudgeSubmitWireSchema = z.object({
+export const LegacyJudgeSubmitWireSchema = z.object({
   judgeID: z.string(),
   teamID: z.string(),
   eventID: z.string(),
@@ -702,17 +932,19 @@ export const JudgeSubmitWireSchema = z.object({
   scores: z.lazy(() => JudgeScoresSchema),
   feedback: z.unknown().optional(),
 });
-/** Output of `bt.judge(…).submit`. Confirmation. */
-export type JudgeSubmitOutput = {
+/** Everything the server receives for `bt.legacyJudge(judgeID).submit`: scope key, resource key, and input. */
+export type LegacyJudgeSubmitWire = z.infer<typeof LegacyJudgeSubmitWireSchema>;
+/** Output of `bt.legacyJudge(judgeID).submit`. Confirmation. */
+export type LegacyJudgeSubmitOutput = {
   /** Human-readable confirmation. */
   message: string;
 };
-export const JudgeSubmitOutputSchema: z.ZodType<JudgeSubmitOutput> = z.object({
+export const LegacyJudgeSubmitOutputSchema: z.ZodType<LegacyJudgeSubmitOutput> = z.object({
   message: z.string(),
 });
 
-/** Input for `bt.judge(…).updateSubmission`. */
-export interface JudgeUpdateSubmissionInput {
+/** Input for `bt.legacyJudge(judgeID).updateSubmission`. */
+export interface LegacyJudgeUpdateSubmissionInput {
   /** Team UUID. */
   teamID: string;
   /** Round the submission was made in. */
@@ -724,7 +956,7 @@ export interface JudgeUpdateSubmissionInput {
   /** Replacement judge display name. */
   judgeName?: string;
 }
-export const JudgeUpdateSubmissionWireSchema = z.object({
+export const LegacyJudgeUpdateSubmissionWireSchema = z.object({
   judgeID: z.string(),
   teamID: z.string(),
   round: z.string(),
@@ -732,18 +964,22 @@ export const JudgeUpdateSubmissionWireSchema = z.object({
   feedback: z.unknown().optional(),
   judgeName: z.string().optional(),
 });
-/** Output of `bt.judge(…).updateSubmission`. Confirmation. */
-export type JudgeUpdateSubmissionOutput = {
+/** Everything the server receives for `bt.legacyJudge(judgeID).updateSubmission`: scope key, resource key, and input. */
+export type LegacyJudgeUpdateSubmissionWire = z.infer<typeof LegacyJudgeUpdateSubmissionWireSchema>;
+/** Output of `bt.legacyJudge(judgeID).updateSubmission`. Confirmation. */
+export type LegacyJudgeUpdateSubmissionOutput = {
   /** Human-readable confirmation. */
   message: string;
 };
-export const JudgeUpdateSubmissionOutputSchema: z.ZodType<JudgeUpdateSubmissionOutput> = z.object({
+export const LegacyJudgeUpdateSubmissionOutputSchema: z.ZodType<LegacyJudgeUpdateSubmissionOutput> = z.object({
   message: z.string(),
 });
 
 export const JudgingRoundGetWireSchema = z.object({
 });
-/** Output of `bt.judgingRound(…).get`. Current round. */
+/** Everything the server receives for `bt.judgingRound.get`: scope key, resource key, and input. */
+export type JudgingRoundGetWire = z.infer<typeof JudgingRoundGetWireSchema>;
+/** Output of `bt.judgingRound.get`. Current round. */
 export type JudgingRoundGetOutput = {
   /** Round identifier, e.g. `"1"`. A string on the wire. */
   round: string;
@@ -752,7 +988,7 @@ export const JudgingRoundGetOutputSchema: z.ZodType<JudgingRoundGetOutput> = z.o
   round: z.string(),
 });
 
-/** Input for `bt.judgingRound(…).set`. */
+/** Input for `bt.judgingRound.set`. */
 export interface JudgingRoundSetInput {
   /** New round identifier. */
   round: string;
@@ -760,12 +996,450 @@ export interface JudgingRoundSetInput {
 export const JudgingRoundSetWireSchema = z.object({
   round: z.string(),
 });
-/** Output of `bt.judgingRound(…).set`. Confirmation. */
+/** Everything the server receives for `bt.judgingRound.set`: scope key, resource key, and input. */
+export type JudgingRoundSetWire = z.infer<typeof JudgingRoundSetWireSchema>;
+/** Output of `bt.judgingRound.set`. Confirmation. */
 export type JudgingRoundSetOutput = {
   /** Human-readable confirmation. */
   message: string;
 };
 export const JudgingRoundSetOutputSchema: z.ZodType<JudgingRoundSetOutput> = z.object({
+  message: z.string(),
+});
+
+/** Input for `bt.judging(eventID, year).session.login`. */
+export interface JudgingSessionLoginInput {
+  /** The code the person typed. Case-insensitive, whitespace trimmed. */
+  code: string;
+}
+export const JudgingSessionLoginWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  code: z.string(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).session.login`: scope key, resource key, and input. */
+export type JudgingSessionLoginWire = z.infer<typeof JudgingSessionLoginWireSchema>;
+/** Output of `bt.judging(eventID, year).session.login`. Who the code is. */
+export type JudgingSessionLoginOutput = JudgingSession;
+export const JudgingSessionLoginOutputSchema: z.ZodType<JudgingSessionLoginOutput> = z.lazy(() => JudgingSessionSchema);
+
+export const JudgingSessionMeWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).session.me`: scope key, resource key, and input. */
+export type JudgingSessionMeWire = z.infer<typeof JudgingSessionMeWireSchema>;
+/** Output of `bt.judging(eventID, year).session.me`. The caller. */
+export type JudgingSessionMeOutput = JudgingSession;
+export const JudgingSessionMeOutputSchema: z.ZodType<JudgingSessionMeOutput> = z.lazy(() => JudgingSessionSchema);
+
+export const JudgingSettingsGetWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).settings.get`: scope key, resource key, and input. */
+export type JudgingSettingsGetWire = z.infer<typeof JudgingSettingsGetWireSchema>;
+/** Output of `bt.judging(eventID, year).settings.get`. The settings. */
+export type JudgingSettingsGetOutput = JudgingSettings;
+export const JudgingSettingsGetOutputSchema: z.ZodType<JudgingSettingsGetOutput> = z.lazy(() => JudgingSettingsSchema);
+
+/** Input for `bt.judging(eventID, year).settings.set`. */
+export interface JudgingSettingsSetInput {
+  /** Display name. */
+  eventName: string;
+  /** Phase. */
+  phase: "setup" | "prelim" | "finals" | "closed";
+  /** Judges per team for auto-assign. */
+  perTeamJudges: number;
+  /** Default number of finalists. */
+  finalsTopN: number;
+  /** Finalist teams. */
+  finalsTeamIds: string[];
+  /** Finals judges. */
+  finalsJudgeIds: string[];
+  /** Teams may see results. */
+  resultsPublic: boolean;
+}
+export const JudgingSettingsSetWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  eventName: z.string(),
+  phase: z.enum(["setup", "prelim", "finals", "closed"]),
+  perTeamJudges: z.number().int(),
+  finalsTopN: z.number().int(),
+  finalsTeamIds: z.array(z.string()),
+  finalsJudgeIds: z.array(z.string()),
+  resultsPublic: z.boolean(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).settings.set`: scope key, resource key, and input. */
+export type JudgingSettingsSetWire = z.infer<typeof JudgingSettingsSetWireSchema>;
+/** Output of `bt.judging(eventID, year).settings.set`. The stored settings. */
+export type JudgingSettingsSetOutput = JudgingSettings;
+export const JudgingSettingsSetOutputSchema: z.ZodType<JudgingSettingsSetOutput> = z.lazy(() => JudgingSettingsSchema);
+
+export const JudgingRubricGetWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).rubric.get`: scope key, resource key, and input. */
+export type JudgingRubricGetWire = z.infer<typeof JudgingRubricGetWireSchema>;
+/** Output of `bt.judging(eventID, year).rubric.get`. The rubric. */
+export type JudgingRubricGetOutput = Rubric;
+export const JudgingRubricGetOutputSchema: z.ZodType<JudgingRubricGetOutput> = z.lazy(() => RubricSchema);
+
+/** Input for `bt.judging(eventID, year).rubric.set`. */
+export interface JudgingRubricSetInput {
+  /** Rubric name. */
+  name: string;
+  /** Max per criterion. */
+  scaleMax: number;
+  /** Total mode. */
+  scoreMode: "points" | "weighted";
+  /** Criteria in order. At least one. */
+  criteria: Array<{
+    /** Stable id. */
+    id: string;
+    /** Label. */
+    label: string;
+    /** Guidance. */
+    description?: string;
+    /** Weight. */
+    weight: number;
+    /** Per-criterion max. */
+    maxScore?: number;
+  }>;
+}
+export const JudgingRubricSetWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  name: z.string(),
+  scaleMax: z.number().int(),
+  scoreMode: z.enum(["points", "weighted"]),
+  criteria: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    description: z.string().optional(),
+    weight: z.number(),
+    maxScore: z.number().int().optional(),
+  })),
+});
+/** Everything the server receives for `bt.judging(eventID, year).rubric.set`: scope key, resource key, and input. */
+export type JudgingRubricSetWire = z.infer<typeof JudgingRubricSetWireSchema>;
+/** Output of `bt.judging(eventID, year).rubric.set`. The stored rubric. */
+export type JudgingRubricSetOutput = Rubric;
+export const JudgingRubricSetOutputSchema: z.ZodType<JudgingRubricSetOutput> = z.lazy(() => RubricSchema);
+
+export const JudgingTeamsListWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).teams.list`: scope key, resource key, and input. */
+export type JudgingTeamsListWire = z.infer<typeof JudgingTeamsListWireSchema>;
+/** Output of `bt.judging(eventID, year).teams.list`. Teams by name. */
+export type JudgingTeamsListOutput = JudgingTeam[];
+export const JudgingTeamsListOutputSchema: z.ZodType<JudgingTeamsListOutput> = z.array(z.lazy(() => JudgingTeamSchema));
+
+/** Input for `bt.judging(eventID, year).teams.create`. */
+export interface JudgingTeamsCreateInput {
+  /** Team name. */
+  name: string;
+  /** Member display names. */
+  members: string[];
+  /** Project pitch. */
+  description?: string;
+  /** Repository URL. */
+  github?: string;
+  /** Devpost URL. */
+  devpost?: string;
+  /** Screenshots. */
+  imageUrls?: string[];
+}
+export const JudgingTeamsCreateWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  name: z.string(),
+  members: z.array(z.string()),
+  description: z.string().optional(),
+  github: z.string().optional(),
+  devpost: z.string().optional(),
+  imageUrls: z.array(z.string()).optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).teams.create`: scope key, resource key, and input. */
+export type JudgingTeamsCreateWire = z.infer<typeof JudgingTeamsCreateWireSchema>;
+/** Output of `bt.judging(eventID, year).teams.create`. The new team, including its code. */
+export type JudgingTeamsCreateOutput = JudgingTeam;
+export const JudgingTeamsCreateOutputSchema: z.ZodType<JudgingTeamsCreateOutput> = z.lazy(() => JudgingTeamSchema);
+
+export const JudgingTeamGetWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).team(id).get`: scope key, resource key, and input. */
+export type JudgingTeamGetWire = z.infer<typeof JudgingTeamGetWireSchema>;
+/** Output of `bt.judging(eventID, year).team(id).get`. The team. */
+export type JudgingTeamGetOutput = JudgingTeam;
+export const JudgingTeamGetOutputSchema: z.ZodType<JudgingTeamGetOutput> = z.lazy(() => JudgingTeamSchema);
+
+/** Input for `bt.judging(eventID, year).team(id).update`. */
+export interface JudgingTeamUpdateInput {
+  /** Team name. */
+  name: string;
+  /** Member display names. */
+  members: string[];
+  /** Project pitch. */
+  description?: string;
+  /** Repository URL. */
+  github?: string;
+  /** Devpost URL. */
+  devpost?: string;
+  /** Screenshots. */
+  imageUrls?: string[];
+}
+export const JudgingTeamUpdateWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+  name: z.string(),
+  members: z.array(z.string()),
+  description: z.string().optional(),
+  github: z.string().optional(),
+  devpost: z.string().optional(),
+  imageUrls: z.array(z.string()).optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).team(id).update`: scope key, resource key, and input. */
+export type JudgingTeamUpdateWire = z.infer<typeof JudgingTeamUpdateWireSchema>;
+/** Output of `bt.judging(eventID, year).team(id).update`. The updated team. */
+export type JudgingTeamUpdateOutput = JudgingTeam;
+export const JudgingTeamUpdateOutputSchema: z.ZodType<JudgingTeamUpdateOutput> = z.lazy(() => JudgingTeamSchema);
+
+export const JudgingTeamDeleteWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).team(id).delete`: scope key, resource key, and input. */
+export type JudgingTeamDeleteWire = z.infer<typeof JudgingTeamDeleteWireSchema>;
+/** Output of `bt.judging(eventID, year).team(id).delete`. Deleted. */
+export type JudgingTeamDeleteOutput = {
+  /** Human-readable confirmation. */
+  message: string;
+};
+export const JudgingTeamDeleteOutputSchema: z.ZodType<JudgingTeamDeleteOutput> = z.object({
+  message: z.string(),
+});
+
+export const JudgingJudgesListWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).judges.list`: scope key, resource key, and input. */
+export type JudgingJudgesListWire = z.infer<typeof JudgingJudgesListWireSchema>;
+/** Output of `bt.judging(eventID, year).judges.list`. Judges by name. */
+export type JudgingJudgesListOutput = Judge[];
+export const JudgingJudgesListOutputSchema: z.ZodType<JudgingJudgesListOutput> = z.array(z.lazy(() => JudgeSchema));
+
+/** Input for `bt.judging(eventID, year).judges.create`. */
+export interface JudgingJudgesCreateInput {
+  /** Display name. */
+  name: string;
+  /** Also grant the organizer role. Default false. */
+  isAdmin?: boolean;
+}
+export const JudgingJudgesCreateWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  name: z.string(),
+  isAdmin: z.boolean().optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).judges.create`: scope key, resource key, and input. */
+export type JudgingJudgesCreateWire = z.infer<typeof JudgingJudgesCreateWireSchema>;
+/** Output of `bt.judging(eventID, year).judges.create`. The new judge, including its code. */
+export type JudgingJudgesCreateOutput = Judge;
+export const JudgingJudgesCreateOutputSchema: z.ZodType<JudgingJudgesCreateOutput> = z.lazy(() => JudgeSchema);
+
+/** Input for `bt.judging(eventID, year).judges.autoAssign`. */
+export interface JudgingJudgesAutoAssignInput {
+  /** Override JudgingSettings.perTeamJudges for this run. */
+  perTeamJudges?: number;
+}
+export const JudgingJudgesAutoAssignWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  perTeamJudges: z.number().int().optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).judges.autoAssign`: scope key, resource key, and input. */
+export type JudgingJudgesAutoAssignWire = z.infer<typeof JudgingJudgesAutoAssignWireSchema>;
+/** Output of `bt.judging(eventID, year).judges.autoAssign`. Judge id → team ids. */
+export type JudgingJudgesAutoAssignOutput = Record<string, string[]>;
+export const JudgingJudgesAutoAssignOutputSchema: z.ZodType<JudgingJudgesAutoAssignOutput> = z.record(z.string(), z.array(z.string()));
+
+export const JudgingJudgeGetWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).judge(id).get`: scope key, resource key, and input. */
+export type JudgingJudgeGetWire = z.infer<typeof JudgingJudgeGetWireSchema>;
+/** Output of `bt.judging(eventID, year).judge(id).get`. The judge. */
+export type JudgingJudgeGetOutput = Judge;
+export const JudgingJudgeGetOutputSchema: z.ZodType<JudgingJudgeGetOutput> = z.lazy(() => JudgeSchema);
+
+/** Input for `bt.judging(eventID, year).judge(id).update`. */
+export interface JudgingJudgeUpdateInput {
+  /** New name. */
+  name?: string;
+  /** Organizer role. */
+  isAdmin?: boolean;
+  /** Replace assignments. */
+  assignedTeamIds?: string[];
+}
+export const JudgingJudgeUpdateWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+  name: z.string().optional(),
+  isAdmin: z.boolean().optional(),
+  assignedTeamIds: z.array(z.string()).optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).judge(id).update`: scope key, resource key, and input. */
+export type JudgingJudgeUpdateWire = z.infer<typeof JudgingJudgeUpdateWireSchema>;
+/** Output of `bt.judging(eventID, year).judge(id).update`. The updated judge. */
+export type JudgingJudgeUpdateOutput = Judge;
+export const JudgingJudgeUpdateOutputSchema: z.ZodType<JudgingJudgeUpdateOutput> = z.lazy(() => JudgeSchema);
+
+export const JudgingJudgeDeleteWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).judge(id).delete`: scope key, resource key, and input. */
+export type JudgingJudgeDeleteWire = z.infer<typeof JudgingJudgeDeleteWireSchema>;
+/** Output of `bt.judging(eventID, year).judge(id).delete`. Deleted. */
+export type JudgingJudgeDeleteOutput = {
+  /** Human-readable confirmation. */
+  message: string;
+};
+export const JudgingJudgeDeleteOutputSchema: z.ZodType<JudgingJudgeDeleteOutput> = z.object({
+  message: z.string(),
+});
+
+/** Input for `bt.judging(eventID, year).reviews.list`. */
+export interface JudgingReviewsListInput {
+  /** Restrict to a round. */
+  round?: "prelim" | "finals";
+  /** Restrict to a team. */
+  teamId?: string;
+  /** Restrict to a judge. */
+  judgeId?: string;
+}
+export const JudgingReviewsListWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  round: z.enum(["prelim", "finals"]).optional(),
+  teamId: z.string().optional(),
+  judgeId: z.string().optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).reviews.list`: scope key, resource key, and input. */
+export type JudgingReviewsListWire = z.infer<typeof JudgingReviewsListWireSchema>;
+/** Output of `bt.judging(eventID, year).reviews.list`. Matching reviews, newest first. */
+export type JudgingReviewsListOutput = Review[];
+export const JudgingReviewsListOutputSchema: z.ZodType<JudgingReviewsListOutput> = z.array(z.lazy(() => ReviewSchema));
+
+/** Input for `bt.judging(eventID, year).reviews.submit`. */
+export interface JudgingReviewsSubmitInput {
+  /** Team being scored. */
+  teamId: string;
+  /** Keyed by criterion id. Every rubric criterion must be present and within range. */
+  scores: Record<string, number>;
+  /** Written feedback. */
+  feedback?: string;
+}
+export const JudgingReviewsSubmitWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  teamId: z.string(),
+  scores: z.record(z.string(), z.number()),
+  feedback: z.string().optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).reviews.submit`: scope key, resource key, and input. */
+export type JudgingReviewsSubmitWire = z.infer<typeof JudgingReviewsSubmitWireSchema>;
+/** Output of `bt.judging(eventID, year).reviews.submit`. The stored review with computed totals. */
+export type JudgingReviewsSubmitOutput = Review;
+export const JudgingReviewsSubmitOutputSchema: z.ZodType<JudgingReviewsSubmitOutput> = z.lazy(() => ReviewSchema);
+
+export const JudgingReviewGetWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).review(id).get`: scope key, resource key, and input. */
+export type JudgingReviewGetWire = z.infer<typeof JudgingReviewGetWireSchema>;
+/** Output of `bt.judging(eventID, year).review(id).get`. The review. */
+export type JudgingReviewGetOutput = Review;
+export const JudgingReviewGetOutputSchema: z.ZodType<JudgingReviewGetOutput> = z.lazy(() => ReviewSchema);
+
+export const JudgingReviewDeleteWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).review(id).delete`: scope key, resource key, and input. */
+export type JudgingReviewDeleteWire = z.infer<typeof JudgingReviewDeleteWireSchema>;
+/** Output of `bt.judging(eventID, year).review(id).delete`. Deleted. */
+export type JudgingReviewDeleteOutput = {
+  /** Human-readable confirmation. */
+  message: string;
+};
+export const JudgingReviewDeleteOutputSchema: z.ZodType<JudgingReviewDeleteOutput> = z.object({
+  message: z.string(),
+});
+
+export const JudgingLinksListWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).links.list`: scope key, resource key, and input. */
+export type JudgingLinksListWire = z.infer<typeof JudgingLinksListWireSchema>;
+/** Output of `bt.judging(eventID, year).links.list`. Links by order. */
+export type JudgingLinksListOutput = JudgingLink[];
+export const JudgingLinksListOutputSchema: z.ZodType<JudgingLinksListOutput> = z.array(z.lazy(() => JudgingLinkSchema));
+
+/** Input for `bt.judging(eventID, year).links.create`. */
+export interface JudgingLinksCreateInput {
+  /** Text. */
+  label: string;
+  /** Destination. */
+  url: string;
+  /** Sort key; default appends. */
+  order?: number;
+}
+export const JudgingLinksCreateWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  label: z.string(),
+  url: z.string(),
+  order: z.number().int().optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).links.create`: scope key, resource key, and input. */
+export type JudgingLinksCreateWire = z.infer<typeof JudgingLinksCreateWireSchema>;
+/** Output of `bt.judging(eventID, year).links.create`. The new link. */
+export type JudgingLinksCreateOutput = JudgingLink;
+export const JudgingLinksCreateOutputSchema: z.ZodType<JudgingLinksCreateOutput> = z.lazy(() => JudgingLinkSchema);
+
+export const JudgingLinkDeleteWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  id: z.string(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).link(id).delete`: scope key, resource key, and input. */
+export type JudgingLinkDeleteWire = z.infer<typeof JudgingLinkDeleteWireSchema>;
+/** Output of `bt.judging(eventID, year).link(id).delete`. Deleted. */
+export type JudgingLinkDeleteOutput = {
+  /** Human-readable confirmation. */
+  message: string;
+};
+export const JudgingLinkDeleteOutputSchema: z.ZodType<JudgingLinkDeleteOutput> = z.object({
   message: z.string(),
 });
 

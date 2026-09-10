@@ -14,7 +14,7 @@ describe("semver classification", () => {
     n.roles.exec = { description: "x" };
     n.resources.event!.instance.archive = { ...n.resources.event!.instance.get!, description: "x" };
     n.resources.team!.links.event = { description: "x", via: "event.get", map: { id: "id" } };
-    n.resources.widget = { singular: "widget", description: "x", key: {}, collection: {}, instance: {}, links: {} };
+    n.resources.widget = { singular: "widget", service: "legacy", description: "x", key: {}, collection: {}, instance: {}, links: {} };
     expect(classify(ontology, n).bump).toBe("minor");
   });
 

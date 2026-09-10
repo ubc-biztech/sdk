@@ -38,3 +38,48 @@ export class NotAJudgeError extends BtError {
   override readonly name = "NotAJudgeError";
 }
 
+/** No judge, team or admin code matches. */
+export class UnknownCodeError extends BtError {
+  override readonly name = "UnknownCodeError";
+}
+
+/** No rubric set yet. */
+export class RubricNotFoundError extends BtError {
+  override readonly name = "RubricNotFoundError";
+}
+
+/** No criteria, duplicate criterion ids, or a non-positive scale. */
+export class InvalidRubricError extends BtError {
+  override readonly name = "InvalidRubricError";
+}
+
+/** A team code tried to edit a different team. */
+export class ForbiddenError extends BtError {
+  override readonly name = "ForbiddenError";
+}
+
+/** There are no non-admin judges to assign. */
+export class NoJudgesError extends BtError {
+  override readonly name = "NoJudgesError";
+}
+
+/** No such judge. */
+export class JudgeNotFoundError extends BtError {
+  override readonly name = "JudgeNotFoundError";
+}
+
+/** The phase is `setup` or `closed`, or this judge is not a finals judge / team is not a finalist. */
+export class PhaseClosedError extends BtError {
+  override readonly name = "PhaseClosedError";
+}
+
+/** No such review. */
+export class ReviewNotFoundError extends BtError {
+  override readonly name = "ReviewNotFoundError";
+}
+
+/** No such link. */
+export class LinkNotFoundError extends BtError {
+  override readonly name = "LinkNotFoundError";
+}
+

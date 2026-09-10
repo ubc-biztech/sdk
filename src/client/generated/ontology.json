@@ -7,10 +7,31 @@
       "description": "Any valid Cognito JWT for the environment's user pool."
     },
     "member": {
-      "description": "Authenticated, and the caller's biztechUsers record has isMember === true."
+      "description": "Authenticated, and the caller's biztechUsers record has isMember === true.",
+      "implies": [
+        "authenticated"
+      ]
     },
     "admin": {
-      "description": "Today: caller's email ends with @ubcbiztech.com. Intended: Cognito group `admin`."
+      "description": "Today: caller's email ends with @ubcbiztech.com. Intended: Cognito group `admin`.",
+      "implies": [
+        "member"
+      ]
+    },
+    "judgingCode": {
+      "description": "Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the handler's job."
+    },
+    "judge": {
+      "description": "Bearer token is a judge code for the event.",
+      "implies": [
+        "judgingCode"
+      ]
+    },
+    "judgingAdmin": {
+      "description": "Bearer token is the event's organizer code.",
+      "implies": [
+        "judge"
+      ]
     }
   },
   "entities": {
@@ -573,6 +594,304 @@
           "description": "Raw per-judge scores before normalization."
         }
       }
+    },
+    "JudgingSettings": {
+      "name": "JudgingSettings",
+      "description": "Per-event judging configuration and phase. One record per event.",
+      "fields": {
+        "eventName": {
+          "kind": "string",
+          "description": "Display name, e.g. `HelloHacks 2027`."
+        },
+        "phase": {
+          "kind": "enum",
+          "values": [
+            "setup",
+            "prelim",
+            "finals",
+            "closed"
+          ],
+          "description": "Where the event is. Judges can only submit in `prelim` and `finals`; results are public in `closed`."
+        },
+        "perTeamJudges": {
+          "kind": "integer",
+          "description": "How many judges auto-assign gives each team."
+        },
+        "finalsTopN": {
+          "kind": "integer",
+          "description": "How many prelim teams advance to finals by default."
+        },
+        "finalsTeamIds": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Team id."
+          },
+          "description": "Teams in the finals round. Empty until finals are set up."
+        },
+        "finalsJudgeIds": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Judge id."
+          },
+          "description": "Judges who score finals. Empty until finals are set up."
+        },
+        "resultsPublic": {
+          "kind": "boolean",
+          "description": "Teams may see their own feedback and the leaderboard."
+        },
+        "updatedAt": {
+          "kind": "string",
+          "description": "ISO-8601."
+        }
+      }
+    },
+    "Rubric": {
+      "name": "Rubric",
+      "description": "The scoring rubric for an event. Reviews are scored per criterion against this; totals are computed from it.",
+      "fields": {
+        "name": {
+          "kind": "string",
+          "description": "Rubric name."
+        },
+        "scaleMax": {
+          "kind": "integer",
+          "description": "Highest score on each criterion, e.g. 5 or 10."
+        },
+        "scoreMode": {
+          "kind": "enum",
+          "values": [
+            "points",
+            "weighted"
+          ],
+          "description": "`points`: total is the sum of raw scores. `weighted`: each criterion is multiplied by its weight."
+        },
+        "criteria": {
+          "kind": "array",
+          "items": {
+            "kind": "object",
+            "fields": {
+              "id": {
+                "kind": "string",
+                "description": "Stable id; the key in Review.scores."
+              },
+              "label": {
+                "kind": "string",
+                "description": "Short name shown to judges."
+              },
+              "description": {
+                "kind": "string",
+                "optional": true,
+                "description": "Guidance shown under the label."
+              },
+              "weight": {
+                "kind": "number",
+                "description": "Multiplier in `weighted` mode; 1 means neutral."
+              },
+              "maxScore": {
+                "kind": "integer",
+                "optional": true,
+                "description": "Overrides scaleMax for this criterion."
+              }
+            },
+            "description": "One criterion."
+          },
+          "description": "Criteria in display order."
+        },
+        "updatedAt": {
+          "kind": "string",
+          "description": "ISO-8601."
+        }
+      }
+    },
+    "JudgingTeam": {
+      "name": "JudgingTeam",
+      "description": "A team being judged. Independent of the `Team` entity used by the main app; hackathon teams are created by organizers or self-registered with a code.",
+      "fields": {
+        "id": {
+          "kind": "string",
+          "description": "ULID, assigned on create."
+        },
+        "name": {
+          "kind": "string",
+          "description": "Team name."
+        },
+        "members": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Member name."
+          },
+          "description": "Member display names."
+        },
+        "description": {
+          "kind": "string",
+          "optional": true,
+          "description": "Project pitch. Markdown-ish."
+        },
+        "github": {
+          "kind": "string",
+          "optional": true,
+          "description": "Repository URL."
+        },
+        "devpost": {
+          "kind": "string",
+          "optional": true,
+          "description": "Devpost URL."
+        },
+        "imageUrls": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Image URL."
+          },
+          "description": "Screenshots. URLs only; upload is the client's concern for now."
+        },
+        "code": {
+          "kind": "string",
+          "optional": true,
+          "description": "Login code for the team's own feedback page. Only returned to `judgingAdmin`."
+        },
+        "createdAt": {
+          "kind": "string",
+          "description": "ISO-8601."
+        }
+      }
+    },
+    "Judge": {
+      "name": "Judge",
+      "description": "A judge for one event. Has no BizTech account; logs in with `code`.",
+      "fields": {
+        "id": {
+          "kind": "string",
+          "description": "ULID, assigned on create."
+        },
+        "name": {
+          "kind": "string",
+          "description": "Display name, shown on reviews."
+        },
+        "code": {
+          "kind": "string",
+          "optional": true,
+          "description": "Login code. Only returned to `judgingAdmin`."
+        },
+        "isAdmin": {
+          "kind": "boolean",
+          "description": "This judge's code also grants `judgingAdmin`."
+        },
+        "assignedTeamIds": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Team id."
+          },
+          "description": "Teams this judge scores in prelims, in order."
+        }
+      }
+    },
+    "Review": {
+      "name": "Review",
+      "description": "One judge's scores for one team in one round. Id is deterministic (`<round>__<teamId>__<judgeId>`) so a resubmit replaces rather than duplicates.",
+      "fields": {
+        "id": {
+          "kind": "string",
+          "description": "`<round>__<teamId>__<judgeId>`."
+        },
+        "round": {
+          "kind": "enum",
+          "values": [
+            "prelim",
+            "finals"
+          ],
+          "description": "Round the review belongs to."
+        },
+        "teamId": {
+          "kind": "string",
+          "description": "JudgingTeam id."
+        },
+        "judgeId": {
+          "kind": "string",
+          "description": "Judge id."
+        },
+        "judgeName": {
+          "kind": "string",
+          "description": "Judge display name at submission."
+        },
+        "scores": {
+          "kind": "record",
+          "values": {
+            "kind": "number",
+            "description": "Score for the criterion."
+          },
+          "description": "Keyed by Rubric.criteria[].id."
+        },
+        "feedback": {
+          "kind": "string",
+          "description": "Written feedback. Empty string when none."
+        },
+        "total": {
+          "kind": "number",
+          "description": "Sum of raw scores, computed server-side from the rubric at submission."
+        },
+        "weightedTotal": {
+          "kind": "number",
+          "description": "Sum of score × weight, computed server-side."
+        },
+        "completedAt": {
+          "kind": "string",
+          "description": "ISO-8601."
+        }
+      }
+    },
+    "JudgingLink": {
+      "name": "JudgingLink",
+      "description": "A link shown on the portal home page (schedule, Discord, rules).",
+      "fields": {
+        "id": {
+          "kind": "string",
+          "description": "ULID."
+        },
+        "label": {
+          "kind": "string",
+          "description": "Link text."
+        },
+        "url": {
+          "kind": "string",
+          "description": "Destination."
+        },
+        "order": {
+          "kind": "integer",
+          "description": "Sort key, ascending."
+        }
+      }
+    },
+    "JudgingSession": {
+      "name": "JudgingSession",
+      "description": "Who a code belongs to. Returned by `session.login`; the code itself is then used as the bearer token.",
+      "fields": {
+        "role": {
+          "kind": "enum",
+          "values": [
+            "judgingAdmin",
+            "judge",
+            "team"
+          ],
+          "description": "What the code grants."
+        },
+        "id": {
+          "kind": "string",
+          "description": "Judge id or team id. For `judgingAdmin` codes that are not also a judge, the string `admin`."
+        },
+        "name": {
+          "kind": "string",
+          "description": "Display name."
+        },
+        "eventName": {
+          "kind": "string",
+          "description": "From JudgingSettings, so the client can render a header without a second call."
+        }
+      }
     }
   },
   "resources": {
@@ -581,6 +900,7 @@
       "plural": "events",
       "description": "Events. `bt.events` for the collection, `bt.event(id, year)` for one.",
       "entity": "Event",
+      "service": "legacy",
       "key": {
         "id": {
           "kind": "string",
@@ -688,6 +1008,7 @@
       "plural": "registrations",
       "description": "Registrations. Read-only through the SDK for now; writes still go through the registration form.",
       "entity": "Registration",
+      "service": "legacy",
       "key": {},
       "collection": {
         "list": {
@@ -743,6 +1064,7 @@
       "singular": "me",
       "description": "The signed-in user, resolved from the JWT. A singleton: `bt.me.get()`.",
       "entity": "User",
+      "service": "legacy",
       "key": {},
       "collection": {},
       "instance": {
@@ -773,6 +1095,7 @@
       "plural": "users",
       "description": "Users by email. `bt.user(email).get()` is admin-only; non-admins should use `bt.me`.",
       "entity": "User",
+      "service": "legacy",
       "key": {
         "email": {
           "kind": "string",
@@ -808,6 +1131,7 @@
       "plural": "teams",
       "description": "Teams at an event. `bt.teams` for collection actions, `bt.team(id)` for judging actions on one team.",
       "entity": "Team",
+      "service": "legacy",
       "key": {
         "id": {
           "kind": "string",
@@ -1174,9 +1498,10 @@
       },
       "links": {}
     },
-    "judge": {
-      "singular": "judge",
-      "description": "A judge, identified by email. Judges are partner registrations for the event; there is no separate judge record. `bt.judge(email)`.",
+    "legacyJudge": {
+      "singular": "legacyJudge",
+      "description": "The teams service's original five-metric judging flow, keyed by judge email (judges are partner registrations). Superseded by `bt.judging(eventID, year)` for new events; kept for anything still on the old flow. `bt.legacyJudge(email)`.",
+      "service": "legacy",
       "key": {
         "judgeID": {
           "kind": "string",
@@ -1387,6 +1712,7 @@
     "judgingRound": {
       "singular": "judgingRound",
       "description": "The single global judging round counter. A singleton: `bt.judgingRound.get()`. Note it is global, not per event.",
+      "service": "legacy",
       "key": {},
       "collection": {},
       "instance": {
@@ -1432,6 +1758,979 @@
           "route": {
             "method": "PUT",
             "path": "/team/round/{round}"
+          }
+        }
+      },
+      "links": {}
+    },
+    "session": {
+      "singular": "session",
+      "description": "Code login. `bt.judging(e, y).session.login({ code })` returns who the code is; keep the code as the bearer token afterwards.",
+      "entity": "JudgingSession",
+      "scope": {
+        "name": "judging",
+        "description": "One event's judging. Keyed like Event: (eventID, year).",
+        "key": {
+          "eventID": {
+            "kind": "string",
+            "description": "Event id (slug), e.g. `hellohacks`."
+          },
+          "year": {
+            "kind": "integer",
+            "description": "Event year."
+          }
+        }
+      },
+      "service": "judging",
+      "key": {},
+      "collection": {},
+      "instance": {
+        "login": {
+          "errors": {
+            "UnknownCode": {
+              "status": 404,
+              "description": "No judge, team or admin code matches."
+            }
+          },
+          "description": "Resolve a code to a role and identity. Public, rate-limited by the gateway. Returns 404 for an unknown code rather than 401 so the response does not distinguish 'wrong code' from 'no such event'.",
+          "auth": "public",
+          "input": {
+            "code": {
+              "kind": "string",
+              "description": "The code the person typed. Case-insensitive, whitespace trimmed."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingSession",
+            "description": "Who the code is."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/judging/{eventID}/{year}/session/login"
+          }
+        },
+        "me": {
+          "errors": {},
+          "description": "Who the current bearer code is. Use on page load to restore a session.",
+          "auth": "judgingCode",
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingSession",
+            "description": "The caller."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/session"
+          }
+        }
+      },
+      "links": {}
+    },
+    "settings": {
+      "singular": "settings",
+      "description": "Event phase and configuration. A singleton per event.",
+      "entity": "JudgingSettings",
+      "scope": {
+        "name": "judging",
+        "description": "One event's judging. Keyed like Event: (eventID, year).",
+        "key": {
+          "eventID": {
+            "kind": "string",
+            "description": "Event id (slug), e.g. `hellohacks`."
+          },
+          "year": {
+            "kind": "integer",
+            "description": "Event year."
+          }
+        }
+      },
+      "service": "judging",
+      "key": {},
+      "collection": {},
+      "instance": {
+        "get": {
+          "errors": {
+            "EventNotFound": {
+              "status": 404,
+              "description": "No judging has been set up for this event. `settings.set` creates it."
+            }
+          },
+          "description": "Current settings. Public so the landing page can show the phase before login. `finalsJudgeIds` and `finalsTeamIds` are included.",
+          "auth": "public",
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingSettings",
+            "description": "The settings."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/settings"
+          }
+        },
+        "set": {
+          "errors": {},
+          "description": "Create or replace settings. Creating is how an event's judging is initialized; the admin code is set out-of-band (see the service README).",
+          "auth": "judgingAdmin",
+          "input": {
+            "eventName": {
+              "kind": "string",
+              "description": "Display name."
+            },
+            "phase": {
+              "kind": "enum",
+              "values": [
+                "setup",
+                "prelim",
+                "finals",
+                "closed"
+              ],
+              "description": "Phase."
+            },
+            "perTeamJudges": {
+              "kind": "integer",
+              "description": "Judges per team for auto-assign."
+            },
+            "finalsTopN": {
+              "kind": "integer",
+              "description": "Default number of finalists."
+            },
+            "finalsTeamIds": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Team id."
+              },
+              "description": "Finalist teams."
+            },
+            "finalsJudgeIds": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Judge id."
+              },
+              "description": "Finals judges."
+            },
+            "resultsPublic": {
+              "kind": "boolean",
+              "description": "Teams may see results."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingSettings",
+            "description": "The stored settings."
+          },
+          "route": {
+            "method": "PUT",
+            "path": "/judging/{eventID}/{year}/settings"
+          }
+        }
+      },
+      "links": {}
+    },
+    "rubric": {
+      "singular": "rubric",
+      "description": "The event's rubric. A singleton per event.",
+      "entity": "Rubric",
+      "scope": {
+        "name": "judging",
+        "description": "One event's judging. Keyed like Event: (eventID, year).",
+        "key": {
+          "eventID": {
+            "kind": "string",
+            "description": "Event id (slug), e.g. `hellohacks`."
+          },
+          "year": {
+            "kind": "integer",
+            "description": "Event year."
+          }
+        }
+      },
+      "service": "judging",
+      "key": {},
+      "collection": {},
+      "instance": {
+        "get": {
+          "errors": {
+            "RubricNotFound": {
+              "status": 404,
+              "description": "No rubric set yet."
+            }
+          },
+          "description": "The rubric. Judges need it to score; teams need it to read feedback.",
+          "auth": "judgingCode",
+          "output": {
+            "kind": "ref",
+            "entity": "Rubric",
+            "description": "The rubric."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/rubric"
+          }
+        },
+        "set": {
+          "errors": {
+            "InvalidRubric": {
+              "status": 400,
+              "description": "No criteria, duplicate criterion ids, or a non-positive scale."
+            }
+          },
+          "description": "Create or replace the rubric. Existing reviews keep their scores keyed by old criterion ids; totals are not recomputed.",
+          "auth": "judgingAdmin",
+          "input": {
+            "name": {
+              "kind": "string",
+              "description": "Rubric name."
+            },
+            "scaleMax": {
+              "kind": "integer",
+              "description": "Max per criterion."
+            },
+            "scoreMode": {
+              "kind": "enum",
+              "values": [
+                "points",
+                "weighted"
+              ],
+              "description": "Total mode."
+            },
+            "criteria": {
+              "kind": "array",
+              "items": {
+                "kind": "object",
+                "fields": {
+                  "id": {
+                    "kind": "string",
+                    "description": "Stable id."
+                  },
+                  "label": {
+                    "kind": "string",
+                    "description": "Label."
+                  },
+                  "description": {
+                    "kind": "string",
+                    "optional": true,
+                    "description": "Guidance."
+                  },
+                  "weight": {
+                    "kind": "number",
+                    "description": "Weight."
+                  },
+                  "maxScore": {
+                    "kind": "integer",
+                    "optional": true,
+                    "description": "Per-criterion max."
+                  }
+                },
+                "description": "One criterion."
+              },
+              "description": "Criteria in order. At least one."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "Rubric",
+            "description": "The stored rubric."
+          },
+          "route": {
+            "method": "PUT",
+            "path": "/judging/{eventID}/{year}/rubric"
+          }
+        }
+      },
+      "links": {}
+    },
+    "judgingTeam": {
+      "singular": "team",
+      "plural": "teams",
+      "description": "Teams being judged. `bt.judging(e, y).teams.list()`, `bt.judging(e, y).team(id).get()`.",
+      "entity": "JudgingTeam",
+      "scope": {
+        "name": "judging",
+        "description": "One event's judging. Keyed like Event: (eventID, year).",
+        "key": {
+          "eventID": {
+            "kind": "string",
+            "description": "Event id (slug), e.g. `hellohacks`."
+          },
+          "year": {
+            "kind": "integer",
+            "description": "Event year."
+          }
+        }
+      },
+      "service": "judging",
+      "key": {
+        "id": {
+          "kind": "string",
+          "description": "Team id."
+        }
+      },
+      "collection": {
+        "list": {
+          "errors": {},
+          "description": "All teams, sorted by name. `code` is included only for `judgingAdmin` callers.",
+          "auth": "judgingCode",
+          "output": {
+            "kind": "array",
+            "items": {
+              "kind": "ref",
+              "entity": "JudgingTeam",
+              "description": "A team."
+            },
+            "description": "Teams by name."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/teams"
+          }
+        },
+        "create": {
+          "errors": {},
+          "description": "Create a team. A login code is generated and returned.",
+          "auth": "judgingAdmin",
+          "input": {
+            "name": {
+              "kind": "string",
+              "description": "Team name."
+            },
+            "members": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Member name."
+              },
+              "description": "Member display names."
+            },
+            "description": {
+              "kind": "string",
+              "optional": true,
+              "description": "Project pitch."
+            },
+            "github": {
+              "kind": "string",
+              "optional": true,
+              "description": "Repository URL."
+            },
+            "devpost": {
+              "kind": "string",
+              "optional": true,
+              "description": "Devpost URL."
+            },
+            "imageUrls": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Image URL."
+              },
+              "optional": true,
+              "description": "Screenshots."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingTeam",
+            "description": "The new team, including its code."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/judging/{eventID}/{year}/teams"
+          }
+        }
+      },
+      "instance": {
+        "get": {
+          "errors": {
+            "TeamNotFound": {
+              "status": 404,
+              "description": "No such team."
+            }
+          },
+          "description": "One team. `code` only for `judgingAdmin`.",
+          "auth": "judgingCode",
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingTeam",
+            "description": "The team."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/teams/{id}"
+          }
+        },
+        "update": {
+          "errors": {
+            "TeamNotFound": {
+              "status": 404,
+              "description": "No such team."
+            },
+            "Forbidden": {
+              "status": 403,
+              "description": "A team code tried to edit a different team."
+            }
+          },
+          "description": "Replace the editable fields. A team's own code may update its own team (submission page); admins may update any.",
+          "auth": "judgingCode",
+          "input": {
+            "name": {
+              "kind": "string",
+              "description": "Team name."
+            },
+            "members": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Member name."
+              },
+              "description": "Member display names."
+            },
+            "description": {
+              "kind": "string",
+              "optional": true,
+              "description": "Project pitch."
+            },
+            "github": {
+              "kind": "string",
+              "optional": true,
+              "description": "Repository URL."
+            },
+            "devpost": {
+              "kind": "string",
+              "optional": true,
+              "description": "Devpost URL."
+            },
+            "imageUrls": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Image URL."
+              },
+              "optional": true,
+              "description": "Screenshots."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingTeam",
+            "description": "The updated team."
+          },
+          "route": {
+            "method": "PUT",
+            "path": "/judging/{eventID}/{year}/teams/{id}"
+          }
+        },
+        "delete": {
+          "errors": {
+            "TeamNotFound": {
+              "status": 404,
+              "description": "No such team."
+            }
+          },
+          "description": "Delete a team and its reviews.",
+          "auth": "judgingAdmin",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Deleted."
+          },
+          "route": {
+            "method": "DELETE",
+            "path": "/judging/{eventID}/{year}/teams/{id}"
+          }
+        }
+      },
+      "links": {
+        "reviews": {
+          "description": "Reviews of this team across rounds. Team codes see them only when results are public.",
+          "via": "judging.reviews.list",
+          "map": {
+            "eventID": "eventID",
+            "year": "year",
+            "teamId": "id"
+          }
+        }
+      }
+    },
+    "judge": {
+      "singular": "judge",
+      "plural": "judges",
+      "description": "Judges. `bt.judging(e, y).judges.list()`, `bt.judging(e, y).judge(id).get()`.",
+      "entity": "Judge",
+      "scope": {
+        "name": "judging",
+        "description": "One event's judging. Keyed like Event: (eventID, year).",
+        "key": {
+          "eventID": {
+            "kind": "string",
+            "description": "Event id (slug), e.g. `hellohacks`."
+          },
+          "year": {
+            "kind": "integer",
+            "description": "Event year."
+          }
+        }
+      },
+      "service": "judging",
+      "key": {
+        "id": {
+          "kind": "string",
+          "description": "Judge id."
+        }
+      },
+      "collection": {
+        "list": {
+          "errors": {},
+          "description": "All judges. `code` only for `judgingAdmin`.",
+          "auth": "judge",
+          "output": {
+            "kind": "array",
+            "items": {
+              "kind": "ref",
+              "entity": "Judge",
+              "description": "A judge."
+            },
+            "description": "Judges by name."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/judges"
+          }
+        },
+        "create": {
+          "errors": {},
+          "description": "Create a judge. A login code is generated and returned.",
+          "auth": "judgingAdmin",
+          "input": {
+            "name": {
+              "kind": "string",
+              "description": "Display name."
+            },
+            "isAdmin": {
+              "kind": "boolean",
+              "optional": true,
+              "description": "Also grant the organizer role. Default false."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "Judge",
+            "description": "The new judge, including its code."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/judging/{eventID}/{year}/judges"
+          }
+        },
+        "autoAssign": {
+          "errors": {
+            "NoJudges": {
+              "status": 409,
+              "description": "There are no non-admin judges to assign."
+            }
+          },
+          "description": "Round-robin every team to `perTeamJudges` non-admin judges, replacing all existing prelim assignments.",
+          "auth": "judgingAdmin",
+          "input": {
+            "perTeamJudges": {
+              "kind": "integer",
+              "optional": true,
+              "description": "Override JudgingSettings.perTeamJudges for this run."
+            }
+          },
+          "output": {
+            "kind": "record",
+            "values": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Team id."
+              },
+              "description": "Teams assigned to the judge."
+            },
+            "description": "Judge id → team ids."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/judging/{eventID}/{year}/judges/auto-assign"
+          }
+        }
+      },
+      "instance": {
+        "get": {
+          "errors": {
+            "JudgeNotFound": {
+              "status": 404,
+              "description": "No such judge."
+            }
+          },
+          "description": "One judge. `code` only for `judgingAdmin`.",
+          "auth": "judge",
+          "output": {
+            "kind": "ref",
+            "entity": "Judge",
+            "description": "The judge."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/judges/{id}"
+          }
+        },
+        "update": {
+          "errors": {
+            "JudgeNotFound": {
+              "status": 404,
+              "description": "No such judge."
+            }
+          },
+          "description": "Rename, toggle admin, or set assignments.",
+          "auth": "judgingAdmin",
+          "input": {
+            "name": {
+              "kind": "string",
+              "optional": true,
+              "description": "New name."
+            },
+            "isAdmin": {
+              "kind": "boolean",
+              "optional": true,
+              "description": "Organizer role."
+            },
+            "assignedTeamIds": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Team id."
+              },
+              "optional": true,
+              "description": "Replace assignments."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "Judge",
+            "description": "The updated judge."
+          },
+          "route": {
+            "method": "PATCH",
+            "path": "/judging/{eventID}/{year}/judges/{id}"
+          }
+        },
+        "delete": {
+          "errors": {
+            "JudgeNotFound": {
+              "status": 404,
+              "description": "No such judge."
+            }
+          },
+          "description": "Delete a judge. Their reviews are kept.",
+          "auth": "judgingAdmin",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Deleted."
+          },
+          "route": {
+            "method": "DELETE",
+            "path": "/judging/{eventID}/{year}/judges/{id}"
+          }
+        }
+      },
+      "links": {
+        "reviews": {
+          "description": "Everything this judge has submitted.",
+          "via": "judging.reviews.list",
+          "map": {
+            "eventID": "eventID",
+            "year": "year",
+            "judgeId": "id"
+          }
+        }
+      }
+    },
+    "review": {
+      "singular": "review",
+      "plural": "reviews",
+      "description": "Scores. Judges submit with `reviews.submit`; everyone reads with `reviews.list`.",
+      "entity": "Review",
+      "scope": {
+        "name": "judging",
+        "description": "One event's judging. Keyed like Event: (eventID, year).",
+        "key": {
+          "eventID": {
+            "kind": "string",
+            "description": "Event id (slug), e.g. `hellohacks`."
+          },
+          "year": {
+            "kind": "integer",
+            "description": "Event year."
+          }
+        }
+      },
+      "service": "judging",
+      "key": {
+        "id": {
+          "kind": "string",
+          "description": "Review id."
+        }
+      },
+      "collection": {
+        "list": {
+          "errors": {
+            "Forbidden": {
+              "status": 403,
+              "description": "A team code asked for another team, or results are not public yet."
+            }
+          },
+          "description": "Reviews, filtered. Judges see all reviews; a team code sees only its own team's reviews, and only when `resultsPublic`. Admins see everything.",
+          "auth": "judgingCode",
+          "input": {
+            "round": {
+              "kind": "enum",
+              "values": [
+                "prelim",
+                "finals"
+              ],
+              "optional": true,
+              "description": "Restrict to a round."
+            },
+            "teamId": {
+              "kind": "string",
+              "optional": true,
+              "description": "Restrict to a team."
+            },
+            "judgeId": {
+              "kind": "string",
+              "optional": true,
+              "description": "Restrict to a judge."
+            }
+          },
+          "output": {
+            "kind": "array",
+            "items": {
+              "kind": "ref",
+              "entity": "Review",
+              "description": "A review."
+            },
+            "description": "Matching reviews, newest first."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/reviews",
+            "query": [
+              "round",
+              "teamId",
+              "judgeId"
+            ]
+          }
+        },
+        "submit": {
+          "errors": {
+            "TeamNotFound": {
+              "status": 404,
+              "description": "No such team."
+            },
+            "InvalidScores": {
+              "status": 400,
+              "description": "A criterion is missing, extra, or out of range."
+            },
+            "PhaseClosed": {
+              "status": 409,
+              "description": "The phase is `setup` or `closed`, or this judge is not a finals judge / team is not a finalist."
+            }
+          },
+          "description": "Create or replace the caller's review of a team for the current phase's round. Totals are computed server-side from the rubric. Only allowed while the phase is `prelim` or `finals`; in finals only finals judges may score finals teams.",
+          "auth": "judge",
+          "input": {
+            "teamId": {
+              "kind": "string",
+              "description": "Team being scored."
+            },
+            "scores": {
+              "kind": "record",
+              "values": {
+                "kind": "number",
+                "description": "Score."
+              },
+              "description": "Keyed by criterion id. Every rubric criterion must be present and within range."
+            },
+            "feedback": {
+              "kind": "string",
+              "optional": true,
+              "description": "Written feedback."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "Review",
+            "description": "The stored review with computed totals."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/judging/{eventID}/{year}/reviews"
+          }
+        }
+      },
+      "instance": {
+        "get": {
+          "errors": {
+            "ReviewNotFound": {
+              "status": 404,
+              "description": "No such review."
+            },
+            "Forbidden": {
+              "status": 403,
+              "description": "Not visible to this caller."
+            }
+          },
+          "description": "One review.",
+          "auth": "judgingCode",
+          "output": {
+            "kind": "ref",
+            "entity": "Review",
+            "description": "The review."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/reviews/{id}"
+          }
+        },
+        "delete": {
+          "errors": {
+            "ReviewNotFound": {
+              "status": 404,
+              "description": "No such review."
+            }
+          },
+          "description": "Delete a review.",
+          "auth": "judgingAdmin",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Deleted."
+          },
+          "route": {
+            "method": "DELETE",
+            "path": "/judging/{eventID}/{year}/reviews/{id}"
+          }
+        }
+      },
+      "links": {}
+    },
+    "link": {
+      "singular": "link",
+      "plural": "links",
+      "description": "Home-page links.",
+      "entity": "JudgingLink",
+      "scope": {
+        "name": "judging",
+        "description": "One event's judging. Keyed like Event: (eventID, year).",
+        "key": {
+          "eventID": {
+            "kind": "string",
+            "description": "Event id (slug), e.g. `hellohacks`."
+          },
+          "year": {
+            "kind": "integer",
+            "description": "Event year."
+          }
+        }
+      },
+      "service": "judging",
+      "key": {
+        "id": {
+          "kind": "string",
+          "description": "Link id."
+        }
+      },
+      "collection": {
+        "list": {
+          "errors": {},
+          "description": "All links in order.",
+          "auth": "public",
+          "output": {
+            "kind": "array",
+            "items": {
+              "kind": "ref",
+              "entity": "JudgingLink",
+              "description": "A link."
+            },
+            "description": "Links by order."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging/{eventID}/{year}/links"
+          }
+        },
+        "create": {
+          "errors": {},
+          "description": "Add a link.",
+          "auth": "judgingAdmin",
+          "input": {
+            "label": {
+              "kind": "string",
+              "description": "Text."
+            },
+            "url": {
+              "kind": "string",
+              "description": "Destination."
+            },
+            "order": {
+              "kind": "integer",
+              "optional": true,
+              "description": "Sort key; default appends."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingLink",
+            "description": "The new link."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/judging/{eventID}/{year}/links"
+          }
+        }
+      },
+      "instance": {
+        "delete": {
+          "errors": {
+            "LinkNotFound": {
+              "status": 404,
+              "description": "No such link."
+            }
+          },
+          "description": "Remove a link.",
+          "auth": "judgingAdmin",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Deleted."
+          },
+          "route": {
+            "method": "DELETE",
+            "path": "/judging/{eventID}/{year}/links/{id}"
           }
         }
       },

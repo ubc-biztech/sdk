@@ -146,3 +146,97 @@ A team's aggregate for the current round, with judge scores z-normalized so a ha
 | `judges` | array | Judges who scored this team. |
 | `originalResponses` | array | Raw per-judge scores before normalization. |
 
+## JudgingSettings
+
+Per-event judging configuration and phase. One record per event.
+
+| Field | Type | Description |
+|---|---|---|
+| `eventName` | string | Display name, e.g. `HelloHacks 2027`. |
+| `phase` | enum | Where the event is. Judges can only submit in `prelim` and `finals`; results are public in `closed`. |
+| `perTeamJudges` | integer | How many judges auto-assign gives each team. |
+| `finalsTopN` | integer | How many prelim teams advance to finals by default. |
+| `finalsTeamIds` | array | Teams in the finals round. Empty until finals are set up. |
+| `finalsJudgeIds` | array | Judges who score finals. Empty until finals are set up. |
+| `resultsPublic` | boolean | Teams may see their own feedback and the leaderboard. |
+| `updatedAt` | string | ISO-8601. |
+
+## Rubric
+
+The scoring rubric for an event. Reviews are scored per criterion against this; totals are computed from it.
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Rubric name. |
+| `scaleMax` | integer | Highest score on each criterion, e.g. 5 or 10. |
+| `scoreMode` | enum | `points`: total is the sum of raw scores. `weighted`: each criterion is multiplied by its weight. |
+| `criteria` | array | Criteria in display order. |
+| `updatedAt` | string | ISO-8601. |
+
+## JudgingTeam
+
+A team being judged. Independent of the `Team` entity used by the main app; hackathon teams are created by organizers or self-registered with a code.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | ULID, assigned on create. |
+| `name` | string | Team name. |
+| `members` | array | Member display names. |
+| `description` | string? | Project pitch. Markdown-ish. |
+| `github` | string? | Repository URL. |
+| `devpost` | string? | Devpost URL. |
+| `imageUrls` | array | Screenshots. URLs only; upload is the client's concern for now. |
+| `code` | string? | Login code for the team's own feedback page. Only returned to `judgingAdmin`. |
+| `createdAt` | string | ISO-8601. |
+
+## Judge
+
+A judge for one event. Has no BizTech account; logs in with `code`.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | ULID, assigned on create. |
+| `name` | string | Display name, shown on reviews. |
+| `code` | string? | Login code. Only returned to `judgingAdmin`. |
+| `isAdmin` | boolean | This judge's code also grants `judgingAdmin`. |
+| `assignedTeamIds` | array | Teams this judge scores in prelims, in order. |
+
+## Review
+
+One judge's scores for one team in one round. Id is deterministic (`<round>__<teamId>__<judgeId>`) so a resubmit replaces rather than duplicates.
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | `<round>__<teamId>__<judgeId>`. |
+| `round` | enum | Round the review belongs to. |
+| `teamId` | string | JudgingTeam id. |
+| `judgeId` | string | Judge id. |
+| `judgeName` | string | Judge display name at submission. |
+| `scores` | record | Keyed by Rubric.criteria[].id. |
+| `feedback` | string | Written feedback. Empty string when none. |
+| `total` | number | Sum of raw scores, computed server-side from the rubric at submission. |
+| `weightedTotal` | number | Sum of score × weight, computed server-side. |
+| `completedAt` | string | ISO-8601. |
+
+## JudgingLink
+
+A link shown on the portal home page (schedule, Discord, rules).
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | ULID. |
+| `label` | string | Link text. |
+| `url` | string | Destination. |
+| `order` | integer | Sort key, ascending. |
+
+## JudgingSession
+
+Who a code belongs to. Returned by `session.login`; the code itself is then used as the bearer token.
+
+| Field | Type | Description |
+|---|---|---|
+| `role` | enum | What the code grants. |
+| `id` | string | Judge id or team id. For `judgingAdmin` codes that are not also a judge, the string `admin`. |
+| `name` | string | Display name. |
+| `eventName` | string | From JudgingSettings, so the client can render a header without a second call. |
+

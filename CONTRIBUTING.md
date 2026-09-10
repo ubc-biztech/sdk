@@ -55,6 +55,21 @@ instead; the test then fails only on new drift, and fails again if the entry goe
 Do what it says: `major` = first number up, `minor` = second number up, reset the rest to `0`. The
 rule is mechanical and lives in `src/check/semver.ts`; you never need to read it.
 
+### Declare a resource for a generated service
+
+Some resources are served by a backend the SDK generates rather than one it merely calls. Declare
+them with `service: "<name>"` and, usually, a `scope` so they nest under one key:
+
+```ts
+export const judgingScope = { name: "judging", description: "…", key: { eventID: str({...}), year: int({...}) } };
+export const reviews = resource({ singular: "review", plural: "reviews", scope: judgingScope, service: "judging", ... });
+```
+
+`npm run gen` then also writes `src/server/generated/<service>.ts`: a route table, an `Impl` interface with
+one typed method per action, and `createHandler(impl)`. The backend service imports that and supplies the
+methods; see `serverless-biztechapp/services/judging` for the worked example. Adding an action here makes
+the backend fail to compile until the method exists, which is the point.
+
 ### Something else
 
 `guides/how-it-works.md` follows one call end to end and says which files you can ignore.

@@ -10,8 +10,9 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const contract = process.argv.includes("--contract");
-type Step = { name: string; run: () => string | null; fix: string };
+type Step = { name: string; run: () => string | null; fix: string; /** true: a non-null result is a note, not a failure */ soft?: boolean };
 const results: { name: string; ok: boolean; detail: string; fix: string }[] = [];
+const notes: string[] = [];
 
 const sh = (cmd: string): { ok: boolean; out: string } => {
   const r = spawnSync(cmd, { cwd: root, shell: true, encoding: "utf8", env: { ...process.env, FORCE_COLOR: "0" } });
@@ -40,10 +41,11 @@ const steps: Step[] = [
     run: () => {
       const r = sh("npm run -s gen");
       if (!r.ok) return tail(r.out);
-      const d = sh("git diff --stat -- src/client/generated docs");
-      return d.out ? `Regenerated. Changed files:\n${d.out}` : null;
+      const d = sh("git diff --stat -- src/client/generated src/server/generated docs");
+      return d.out ? `Regenerated; these differ from the last commit:\n${d.out}` : null;
     },
-    fix: "The generator has already rewritten them for you. Just `git add src/client/generated docs` and commit.",
+    fix: "The generator has already rewritten them. Commit src/client/generated, src/server/generated and docs together with your ontology change.",
+    soft: true,
   },
   {
     name: "types check",
@@ -99,14 +101,16 @@ if (contract) {
 for (const s of steps) {
   if (process.stdout.isTTY) process.stdout.write(`… ${s.name}`);
   const detail = s.run();
-  const ok = detail === null;
+  const ok = detail === null || !!s.soft;
+  if (detail !== null && s.soft) notes.push(`${s.name}:\n${detail.split("\n").map((l) => `    ${l}`).join("\n")}\n  → ${s.fix}`);
   results.push({ name: s.name, ok, detail: detail ?? "", fix: s.fix });
-  process.stdout.write(`${process.stdout.isTTY ? "\r" : ""}${ok ? "✓" : "✗"} ${s.name}\n`);
+  process.stdout.write(`${process.stdout.isTTY ? "\r" : ""}${ok ? (detail !== null ? "•" : "✓") : "✗"} ${s.name}\n`);
   if (!ok) break; // later steps usually fail for the same reason; do not bury the cause
 }
 
 const failed = results.filter((r) => !r.ok);
 console.log();
+for (const n of notes) console.log(`• ${n}\n`);
 if (!failed.length) {
   console.log(`All green.${contract ? "" : " (Run `npm run check -- --contract` to also verify against api-dev; it needs the network and is read-only.)"}`);
   console.log("If you changed src/ontology/, commit src/client/generated and docs along with it.");

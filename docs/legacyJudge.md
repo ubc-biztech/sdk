@@ -1,14 +1,14 @@
-# `judge`
+# `legacyJudge`
 
-A judge, identified by email. Judges are partner registrations for the event; there is no separate judge record. `bt.judge(email)`.
+The teams service's original five-metric judging flow, keyed by judge email (judges are partner registrations). Superseded by `bt.judging(eventID, year)` for new events; kept for anything still on the old flow. `bt.legacyJudge(email)`.
 
-**Key** (positional arguments of `bt.judge(…)`)
+**Key** (positional arguments of `bt.legacyJudge(…)`)
 
 | Field | Type | Description |
 |---|---|---|
 | `judgeID` | string | Judge's email. |
 
-## `bt.judge(judgeID).currentTeam()`
+## `bt.legacyJudge(judgeID).currentTeam()`
 
 The team this judge is currently assigned to.
 
@@ -17,7 +17,7 @@ The team this judge is currently assigned to.
 
 **Output:** object — Current assignment.
 
-## `bt.judge(judgeID).submissions()`
+## `bt.legacyJudge(judgeID).submissions()`
 
 Everything this judge has submitted, grouped by round. Note: with no submissions the backend currently returns HTTP 500 or 502 (it throws its 404 inside a try, and API Gateway reports the unhandled throw as 502). Catch ApiError with status >= 500 and treat it as empty until that is fixed.
 
@@ -26,7 +26,7 @@ Everything this judge has submitted, grouped by round. Note: with no submissions
 
 **Output:** object — Submissions by round.
 
-## `bt.judge(judgeID).submit(input)`
+## `bt.legacyJudge(judgeID).submit(input)`
 
 Submit scores for a team in the *current* round (the round is read server-side from `bt.judgingRound`). All five metrics must be non-zero; the backend treats 0 as missing. One submission per judge per team per round.
 
@@ -52,7 +52,7 @@ Submit scores for a team in the *current* round (the round is read server-side f
 | `InvalidScoresError` | 400 | A metric is missing or zero. |
 | `NotAJudgeError` | 409 | No partner registration for this judge at this event, or already submitted for this team this round. |
 
-## `bt.judge(judgeID).updateSubmission(input)`
+## `bt.legacyJudge(judgeID).updateSubmission(input)`
 
 Edit an existing submission for a team and round.
 

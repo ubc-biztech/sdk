@@ -178,9 +178,9 @@ export const teams = resource({
   },
 });
 
-export const judges = resource({
-  singular: "judge",
-  description: "A judge, identified by email. Judges are partner registrations for the event; there is no separate judge record. `bt.judge(email)`.",
+export const legacyJudges = resource({
+  singular: "legacyJudge",
+  description: "The teams service's original five-metric judging flow, keyed by judge email (judges are partner registrations). Superseded by `bt.judging(eventID, year)` for new events; kept for anything still on the old flow. `bt.legacyJudge(email)`.",
   key: { judgeID: str({ description: "Judge's email." }) },
   instance: {
     currentTeam: action({

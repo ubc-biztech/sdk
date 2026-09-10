@@ -99,7 +99,8 @@ export function classify(base: Ontology, next: Ontology): { bump: Bump; reasons:
 function requiredBump(from: string, to: string): Bump {
   const [a, b] = [from, to].map((v) => v.split(".").map(Number) as [number, number, number]);
   if (b![0] > a![0]) return "major";
-  if (b![1] > a![1]) return "minor";
+  // Pre-1.0: a minor bump is the breaking bump, per semver's 0.x convention.
+  if (b![1] > a![1]) return a![0] === 0 ? "major" : "minor";
   return "none";
 }
 
