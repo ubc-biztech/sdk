@@ -26,7 +26,13 @@ describe("ontology", () => {
         },
       },
     };
-    expect(() => validate(bad)).toThrow(/auth "wizard".*\n.*shadows the resource key.*\n.*path param \{nope\}.*\n.*description is empty/s);
+    const msg = (() => { try { validate(bad); return ""; } catch (e) { return String(e); } })();
+    // Every message must say what is wrong AND what the options are / where to fix it.
+    expect(msg).toMatch(/auth is "wizard" but the declared roles are "public"/);
+    expect(msg).toMatch(/input field "id" is already a key field.*bt\.thing\(id\)/);
+    expect(msg).toMatch(/route\.path has \{nope\} but no field named "nope" exists\. Available: id/);
+    expect(msg).toMatch(/output: description is empty\. Say what the value means/);
+    expect(msg).toMatch(/Fix them in the files named/);
   });
 
   it("route paths are absolute and never end in a slash", () => {

@@ -1,45 +1,86 @@
-# Contributing to @ubc-biztech/sdk
+# Contributing
 
-You are editing a **declaration**, not an implementation. The client, schemas, error classes and reference
-docs are all generated from `src/ontology/`.
+## The premise
 
-## Loop
+This repo will outlive everyone who understands it. BizTech turns over its exec every year, so the
+realistic maintainer is someone with a partial and partly wrong idea of how it works, probably working
+with a coding agent. The repo is designed for that person:
 
-1. Edit `src/ontology/`. Every field, action, resource and entity needs a `description`; the type system will
-   not let you skip it. Write it for someone who has never seen the backend: meaning, unit or format, when absent.
-2. `npm run gen` — regenerates `src/client/generated/` and `docs/`.
-3. `npm run typecheck && npm test` — unit tests with a fake fetch.
-4. `npm run test:contract` — hits `api-dev` and asserts the declaration against reality. If it fails, the
-   declaration is wrong, not the test. If a specific row on dev is malformed, record it in
-   `test/known-drift.json` with a reason; the test then fails on any *new* drift and on stale entries.
-5. `npm run check:semver -- <base ontology.json>` (e.g. `git show main:src/client/generated/ontology.json > /tmp/b.json`)
-   and bump `package.json` accordingly. CI enforces this on PRs.
+- **One file per change.** Adding or fixing an endpoint touches one file in `src/ontology/entities/`.
+  Nothing else needs to be understood, opened, or edited.
+- **Wrong guesses are cheap.** Every mistake is caught by a machine that says which file and what to
+  change. Nothing here can touch production; the contract test is read-only against `api-dev`.
+- **One command says whether you are done.** `npm run check`. Green means commit.
 
-CI runs the generator and fails if committed output is stale. There is no local ritual you can forget.
+If you find yourself needing to understand `src/gen/` or `src/client/runtime.ts` to add an endpoint,
+that is a bug in this repo. Say so in an issue.
 
-## Declaring an existing endpoint
+## Recipes
 
-```ts
-export const judgingRound = resource({
-  singular: "judgingRound",                    // bt.judgingRound — no key, so a singleton
-  description: "The single global judging round counter.",
-  instance: {
-    get: action({
-      description: "The current round.",
-      auth: "public",                          // must be a key of roles.ts
-      output: obj({ round: str({ description: "Round identifier, a string on the wire." }) }, { description: "Current round." }),
-      route: { method: "GET", path: "/team/round" },   // literal path from the service's serverless.yml
-    }),
-  },
-});
+### Add an endpoint the SDK does not cover yet
+
+```sh
+npm run new -- sticker stickers        # singular, then plural (omit plural for a singleton like judgingRound)
 ```
 
-- `key` fields become the positional parameters of `bt.<singular>(...)`. Fields named `{like_this}` in `route.path`
-  are taken from the key or the input; fields in `route.query` become query params; the rest is the JSON body.
-- `links` map this resource's key onto another action's input. A link is one HTTP call, never a loop.
-- Declare **reality**, not intent. Call the endpoint on `api-dev` first. If the backend has a bug (returns 500
-  for not-found, say), describe the bug in the description rather than declaring the 404 that should exist.
-- Do not add a role because an action needs it. Roles are decided in the RFC.
-- `route.path` is absolute, no trailing slash. Trailing-slash variants are the bug this project exists to end.
-- The generator (`src/gen/`) is meant to be readable in one sitting. If a change to it needs a new
-  abstraction, stop and ask; template strings are the design.
+This creates `src/ontology/entities/sticker.ts` full of `TODO`s and registers it. Then:
+
+1. Call the endpoint on `https://api-dev.ubcbiztech.com` (curl, browser, anything) and look at the
+   real response. Find its path and method in `serverless-biztechapp/services/<service>/serverless.yml`.
+2. Replace every `TODO`. Declare what the endpoint **really** returns, not what it should. If it returns
+   500 for not-found, say so in the description instead of declaring a 404.
+3. `npm run check`. It lists what is still wrong and where. Repeat until green.
+4. `npm run check -- --contract` to prove it against `api-dev` (public endpoints only, without a token).
+5. Commit `src/ontology/`, `src/client/generated/`, `docs/`, and `package.json` together.
+
+### Add an action to an existing resource
+
+Open the resource's file, copy the nearest `action({...})` block, change the description, route, input,
+output and errors. `npm run check`.
+
+### Add a field the backend already returns
+
+Open the entity, add one line inside `fields:`, with a description. `npm run check`. If the field is
+sometimes absent, add `optional: true`; if it is sometimes `null`, add `nullable: true`.
+
+### The contract test failed
+
+The failing assertion names the action. The backend now returns something different from the
+declaration. Look at the real response and change the declaration to match. If exactly one row on dev
+is malformed (a test fixture, say), record it in `test/known-drift.json` with a reason and a date
+instead; the test then fails only on new drift, and fails again if the entry goes stale.
+
+### `npm run check` says to bump the version
+
+Do what it says: `major` = first number up, `minor` = second number up, reset the rest to `0`. The
+rule is mechanical and lives in `src/check/semver.ts`; you never need to read it.
+
+### Something else
+
+`guides/how-it-works.md` follows one call end to end and says which files you can ignore.
+
+## The vocabulary, in one screen
+
+```ts
+entity({ name, description, fields: { id: str({ description }) , ... } })
+resource({
+  singular, plural?, entity?, description,
+  key:        { id: str({...}) },                 // positional args of bt.<singular>(...)
+  collection: { list: action({...}) },            // bt.<plural>.list()
+  instance:   { get: action({...}) },             // bt.<singular>(id).get()
+  links:      { things: link({ via: "things.list", map: { ownerId: "id" }, description }) },
+})
+action({ description, auth, input?, output, errors?, route: { method, path, query?, fixedQuery? } })
+```
+
+Field builders: `str int num bool json oneOf(values) list(items) obj(fields) record(values) ref(Entity)`,
+each taking `{ description, optional?, nullable? }`. `auth` is one of the keys in `src/ontology/roles.ts`.
+Fields named `{like_this}` in `route.path` come from the key or input; `route.query` names query params;
+the rest is the JSON body.
+
+## Rules that the machine does not enforce
+
+- `route.path` is the literal path from `serverless.yml`. Never invent one. Never add a trailing slash.
+- Do not add a role to `roles.ts` because an action needs it. Roles are decided in the RFC.
+- The generator (`src/gen/`) is template strings and must stay readable in one sitting. A test fails if
+  it passes 500 lines. If a change needs a new abstraction there, stop and ask.

@@ -15,12 +15,10 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci --ignore-scripts
-      # The generator runs here and nowhere else. If the committed output is stale, fail.
-      - run: npm run gen
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
-      - run: git diff --exit-code -- src/client/generated docs || (echo "::error::generated output is stale; run npm run gen and commit" && exit 1)
+      # Same command a person runs locally; same output. If it is green here it is green there.
+      - run: npm run check
+      # The generator ran inside `check`. If it changed anything, the commit was missing generated output.
+      - run: git diff --exit-code -- src/client/generated docs || (echo "::error::generated output is stale. Run npm run check locally and commit src/client/generated and docs." && exit 1)
       # The package version bump must be at least what the declaration diff requires.
       - name: semver check
         if: github.event_name == 'pull_request'

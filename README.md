@@ -165,13 +165,18 @@ lint rule against new uses. If the SDK does not cover an endpoint you need, the 
 `src/ontology/` of this repo, not a raw fetch. See [`CONTRIBUTING.md`](./CONTRIBUTING.md), and
 [`guides/judging-portal.md`](./guides/judging-portal.md) for a worked migration.
 
-## Repo layout
+## Changing the SDK
+
+You do not need to understand this repo to add an endpoint. `npm run new -- <singular> <plural>`
+scaffolds it, `npm run check` tells you what is left, and every error names the file and the fix.
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the recipes and [`guides/how-it-works.md`](./guides/how-it-works.md)
+if you want to follow one call end to end.
 
 ```
-src/ontology/   the declaration: roles, entities, resources. The thing to edit.
-src/gen/        the generator (template strings, ~320 lines)
+src/ontology/   the declaration: roles, entities, resources. The only thing you edit.
 src/client/     runtime.ts + index.ts are hand-written; generated/ is not
+src/gen/        the generator (template strings). You should never need to open it.
 docs/           generated reference
-guides/         hand-written migration guides
-test/           unit, validation, semver rules, and the daily contract test against api-dev
+guides/         migration guides and the end-to-end walkthrough
+test/           unit, validation, guardrails, semver rules, and the daily contract test against api-dev
 ```

@@ -34,7 +34,9 @@
     "prepare": "npm run build",
     "test": "vitest run",
     "test:contract": "BT_CONTRACT=1 vitest run test/contract.test.ts",
-    "ci": "npm run gen && npm run typecheck && npm test && npm run build && git diff --exit-code -- src/client/generated docs"
+    "ci": "npm run gen && npm run typecheck && npm test && npm run build && git diff --exit-code -- src/client/generated docs",
+    "check": "tsx src/tools/check.ts",
+    "new": "tsx src/tools/new.ts"
   },
   "peerDependencies": {
     "zod": "^4.0.0"

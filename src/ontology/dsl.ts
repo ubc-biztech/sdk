@@ -183,59 +183,95 @@ export function flatten(o: Ontology): FlatAction[] {
   return out;
 }
 
-/** Structural checks the type system cannot express. Throws with every problem at once. */
+/**
+ * Structural checks the type system cannot express. Throws with every problem at once.
+ *
+ * Messages are written for someone who has never seen this repo: each one says what is
+ * wrong, what the valid options are, and which file to edit. If you are reading a message
+ * from here and it does not tell you what to do, that is a bug in this function.
+ */
 export function validate(o: Ontology): void {
   const problems: string[] = [];
   const flat = flatten(o);
-  const byKey = new Map(flat.map((a) => [a.key, a]));
-  if (byKey.size !== flat.length) problems.push("duplicate action keys (a singular and plural collide)");
+  const roleList = Object.keys(o.roles).map((r) => `"${r}"`).join(", ");
+  const file = (r: ResourceSpec) => `src/ontology/entities/*.ts (resource "${r.singular}")`;
+
+  const seen = new Map<string, FlatAction>();
+  for (const a of flat) {
+    const dup = seen.get(a.key);
+    if (dup) problems.push(`Two actions are both called "${a.key}". A resource's singular must not equal another resource's plural. Rename one in ${file(a.resource)}.`);
+    seen.set(a.key, a);
+  }
 
   for (const a of flat) {
     const s = a.spec;
-    if (!(s.auth in o.roles)) problems.push(`${a.key}: auth "${s.auth}" is not a declared role`);
-    if (a.level === "instance") for (const k of Object.keys(s.input ?? {})) if (k in a.resource.key) problems.push(`${a.key}: input "${k}" shadows the resource key`);
+    const at = `${a.key} in ${file(a.resource)}`;
+    if (/^\/TODO/.test(s.route.path) || s.route.path.includes("/TODO")) problems.push(`${at}: route.path is still "${s.route.path}". Use the exact path from the service's serverless.yml.`);
+    if (!(s.auth in o.roles))
+      problems.push(`${at}: auth is "${s.auth}" but the declared roles are ${roleList}. Pick one, or add the role in src/ontology/roles.ts (that is a decision recorded in the RFC, not a local fix).`);
+    if (a.level === "instance")
+      for (const k of Object.keys(s.input ?? {}))
+        if (k in a.resource.key) problems.push(`${at}: input field "${k}" is already a key field of the resource. Remove it from input; the caller passes it as bt.${a.resource.singular}(${Object.keys(a.resource.key).join(", ")}).`);
     const pathParams = [...s.route.path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!);
+    const available = Object.keys(a.fullInput);
     for (const p of pathParams) {
-      if (!a.fullInput[p]) problems.push(`${a.key}: path param {${p}} is neither a key field nor an input field`);
-      else if (a.fullInput[p]!.optional) problems.push(`${a.key}: path param {${p}} cannot be optional`);
+      if (!a.fullInput[p]) problems.push(`${at}: route.path has {${p}} but no field named "${p}" exists. Available: ${available.length ? available.join(", ") : "(none)"}. Add it to input, or to the resource key if every instance action needs it.`);
+      else if (a.fullInput[p]!.optional) problems.push(`${at}: {${p}} is in route.path so it cannot be optional. Remove \`optional: true\` from "${p}".`);
     }
-    for (const q of s.route.query ?? []) if (!a.fullInput[q]) problems.push(`${a.key}: query field "${q}" is not an input field`);
+    for (const q of s.route.query ?? []) if (!a.fullInput[q]) problems.push(`${at}: route.query lists "${q}" but no input field has that name. Available: ${available.join(", ") || "(none)"}.`);
     if (s.route.method === "GET") {
-      const body = Object.keys(a.fullInput).filter((k) => !pathParams.includes(k) && !(s.route.query ?? []).includes(k));
-      if (body.length) problems.push(`${a.key}: GET cannot carry body fields: ${body.join(", ")}`);
+      const body = available.filter((k) => !pathParams.includes(k) && !(s.route.query ?? []).includes(k));
+      if (body.length) problems.push(`${at}: GET has no body, but these fields are neither in route.path nor route.query: ${body.join(", ")}. Add them to route.query, or change the method.`);
     }
-    walk(s.output, `${a.key}.output`);
-    for (const [k, f] of Object.entries(a.fullInput)) walk(f, `${a.key}.input.${k}`);
-    for (const [en, e] of Object.entries(s.errors)) if (!/^[A-Z]\w*$/.test(en)) problems.push(`${a.key}: error "${en}" must be PascalCase`); else if (e.status < 400) problems.push(`${a.key}: error ${en} status ${e.status} is not an error status`);
+    if (!s.route.path.startsWith("/")) problems.push(`${at}: route.path must start with "/" (it is "${s.route.path}").`);
+    if (s.route.path.length > 1 && s.route.path.endsWith("/")) problems.push(`${at}: route.path must not end with "/" (it is "${s.route.path}"). Trailing-slash variants are the drift this repo exists to end.`);
+    if (!s.description.trim()) problems.push(`${at}: description is empty. Write one sentence saying what the call does and one saying anything surprising about it.`);
+    walk(s.output, `${at}: output`);
+    for (const [k, f] of Object.entries(a.fullInput)) walk(f, `${at}: input.${k}`);
+    for (const [en, e] of Object.entries(s.errors)) {
+      if (!/^[A-Z]\w*$/.test(en)) problems.push(`${at}: error name "${en}" must be PascalCase without the word Error (it becomes the class ${en}Error).`);
+      else if (e.status < 400) problems.push(`${at}: error ${en} has status ${e.status}; errors must be 4xx or 5xx.`);
+    }
   }
   for (const [rk, r] of Object.entries(o.resources)) {
-    if (rk !== r.singular) problems.push(`resources.${rk}: key must equal singular "${r.singular}"`);
-    if (r.entity && !(r.entity in o.entities)) problems.push(`${r.singular}: entity "${r.entity}" is not declared`);
-    if (Object.keys(r.collection).length && !r.plural) problems.push(`${r.singular}: has collection actions but no plural`);
-    if (!r.description.trim()) problems.push(`${r.singular}: description is empty`);
-    for (const [k, f] of Object.entries(r.key)) if (f.optional) problems.push(`${r.singular}.key.${k}: key fields cannot be optional`);
+    if (rk !== r.singular) problems.push(`src/ontology/index.ts: resources.${rk} has singular "${r.singular}". The key must equal the singular; write \`${r.singular}: …\`.`);
+    if (r.entity && !(r.entity in o.entities)) problems.push(`${file(r)}: entity "${r.entity}" is not in src/ontology/index.ts \`entities\`. Add it there.`);
+    if (Object.keys(r.collection).length && !r.plural) problems.push(`${file(r)}: has collection actions but no \`plural\`. Add plural: "…" (it becomes bt.<plural>).`);
+    if (!r.description.trim()) problems.push(`${file(r)}: description is empty.`);
+    for (const [k, f] of Object.entries(r.key)) if (f.optional) problems.push(`${file(r)}: key field "${k}" cannot be optional; keys are positional arguments.`);
     for (const [lk, l] of Object.entries(r.links)) {
-      const target = byKey.get(l.via);
-      if (!target) problems.push(`${r.singular}.links.${lk}: via "${l.via}" is not a declared action`);
-      if (lk in r.instance) problems.push(`${r.singular}.links.${lk}: name collides with an instance action`);
+      const target = seen.get(l.via);
+      const atl = `${file(r)}: links.${lk}`;
+      if (!target) problems.push(`${atl}: via "${l.via}" is not an action. Actions are named "<plural>.<name>" or "<singular>.<name>": ${flat.map((x) => x.key).join(", ")}.`);
+      if (lk in r.instance) problems.push(`${atl}: a link and an instance action are both called "${lk}". Rename one.`);
       for (const [inF, keyF] of Object.entries(l.map)) {
-        if (target && !target.fullInput[inF]) problems.push(`${r.singular}.links.${lk}: map targets unknown input "${inF}" on ${l.via}`);
-        if (!r.key[keyF]) problems.push(`${r.singular}.links.${lk}: map reads "${keyF}", which is not a key field`);
+        if (target && !target.fullInput[inF]) problems.push(`${atl}: map has "${inF}" but ${l.via} has no such input. Its inputs: ${Object.keys(target.fullInput).join(", ") || "(none)"}.`);
+        if (!r.key[keyF]) problems.push(`${atl}: map reads "${keyF}" but the key fields are ${Object.keys(r.key).join(", ") || "(none)"}. A link can only use key fields, because that is all the chain knows.`);
       }
-      if (target) for (const [inF, f] of Object.entries(target.fullInput)) if (!f.optional && !(inF in l.map)) problems.push(`${r.singular}.links.${lk}: required input "${inF}" of ${l.via} is not mapped`);
+      if (target) for (const [inF, f] of Object.entries(target.fullInput)) if (!f.optional && !(inF in l.map)) problems.push(`${atl}: ${l.via} requires "${inF}" but map does not provide it. Add \`${inF}: "<key field>"\` to map.`);
     }
   }
   for (const [name, e] of Object.entries(o.entities)) {
-    if (e.name !== name) problems.push(`entities.${name}: entity.name is "${e.name}"`);
-    if (!e.description.trim()) problems.push(`${name}: description is empty`);
-    for (const [k, f] of Object.entries(e.fields)) walk(f, `${name}.${k}`);
+    if (e.name !== name) problems.push(`src/ontology/index.ts: entities.${name} has name "${e.name}". The key must equal the name.`);
+    if (!e.description.trim()) problems.push(`entity ${name}: description is empty.`);
+    for (const [k, f] of Object.entries(e.fields)) walk(f, `entity ${name}: field ${k}`);
   }
+  // Anything that carries a description goes through here, so "TODO" left by the scaffold is caught in one place.
+  const descriptions: [string, string][] = [
+    ...flat.flatMap((a): [string, string][] => [[`${a.key} in ${file(a.resource)}`, a.spec.description], ...Object.entries(a.spec.errors).map(([en, e]): [string, string] => [`${a.key}: error ${en}`, e.description])]),
+    ...Object.values(o.resources).map((r): [string, string] => [file(r), r.description]),
+    ...Object.values(o.entities).map((e): [string, string] => [`entity ${e.name}`, e.description]),
+    ...Object.entries(o.roles).map(([r, s]): [string, string] => [`role ${r} in src/ontology/roles.ts`, s.description]),
+  ];
+  for (const [at, d] of descriptions) if (/\bTODO\b/.test(d)) problems.push(`${at}: description still says TODO. Replace it with what this really is.`);
+
   function walk(f: FieldSpec, at: string) {
-    if (!f.description?.trim()) problems.push(`${at}: description is empty`);
-    if (f.kind === "ref" && !(f.entity in o.entities)) problems.push(`${at}: ref to unknown entity "${f.entity}"`);
+    if (!f.description?.trim()) problems.push(`${at}: description is empty. Say what the value means, its unit or format, and when it is absent.`);
+    else if (/\bTODO\b/.test(f.description)) problems.push(`${at}: description still says TODO. Replace it with what the value means, its unit or format, and when it is absent.`);
+    if (f.kind === "ref" && !(f.entity in o.entities)) problems.push(`${at}: ref to "${f.entity}", which is not in src/ontology/index.ts \`entities\`. Declared: ${Object.keys(o.entities).join(", ")}.`);
     if (f.kind === "array") walk(f.items, `${at}[]`);
     if (f.kind === "record") walk(f.values, `${at}{}`);
     if (f.kind === "object") for (const [k, c] of Object.entries(f.fields)) walk(c, `${at}.${k}`);
   }
-  if (problems.length) throw new Error(`Ontology is invalid:\n  - ${problems.join("\n  - ")}`);
+  if (problems.length) throw new Error(`The ontology has ${problems.length} problem${problems.length === 1 ? "" : "s"}. Fix them in the files named; nothing else needs to change.\n\n  - ${problems.join("\n\n  - ")}\n`);
 }
