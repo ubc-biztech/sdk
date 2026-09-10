@@ -13,15 +13,18 @@
   "exports": {
     ".": {
       "types": "./dist/client/index.d.ts",
-      "import": "./dist/client/index.js"
+      "import": "./dist/client/index.js",
+      "default": "./dist/client/index.js"
     },
     "./server": {
       "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.js"
+      "import": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
     },
     "./server/*": {
       "types": "./dist/server/generated/*.d.ts",
-      "import": "./dist/server/generated/*.js"
+      "import": "./dist/server/generated/*.js",
+      "default": "./dist/server/generated/*.js"
     }
   },
   "files": [

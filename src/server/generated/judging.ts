@@ -3,6 +3,7 @@ import { createRouter, type ActionError, type BaseImpl, type Ctx, type RouteMeta
 import * as S from "../../client/generated/schemas.js";
 
 export { ActionError } from "../runtime.js";
+export type { Ctx, Principal } from "../runtime.js";
 
 /** Scope key every action in "judging" receives. */
 export type Scope = { eventID: string; year: number };

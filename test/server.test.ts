@@ -95,3 +95,17 @@ describe("generated server router", () => {
     expect((await call("OPTIONS", "/judging/hellohacks/2027/teams")).statusCode).toBe(204);
   });
 });
+
+describe("class-based impl", () => {
+  it("methods are invoked with `this` bound to the impl", async () => {
+    class Impl2 {
+      private readonly name = "HH";
+      async authenticate() { return null; }
+      async settingsGet() { return { eventName: this.name, phase: "prelim" as const, perTeamJudges: 1, finalsTopN: 1, finalsTeamIds: [], finalsJudgeIds: [], resultsPublic: false, updatedAt: "t" }; }
+    }
+    const h = createHandler(new Impl2() as unknown as Impl, () => {});
+    const r = await h({ httpMethod: "GET", path: "/judging/x/2027/settings", headers: {}, requestContext: { requestId: "r" } });
+    expect(r.statusCode).toBe(200);
+    expect(JSON.parse(r.body).eventName).toBe("HH");
+  });
+});

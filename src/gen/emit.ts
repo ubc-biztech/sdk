@@ -241,7 +241,7 @@ export function emitServer(o: Ontology, service: string, actions: FlatAction[]):
   const scopeFrom = scope ? `(p) => ({ ${Object.keys(scope.key).map((k) => `${key(k)}: p[${JSON.stringify(k)}] as ${tsType(scope.key[k]!)}`).join(", ")} })` : `() => ({})`;
 
   let out = `${HEADER}import { createRouter, type ActionError, type BaseImpl, type Ctx, type RouteMeta, type Roles } from "../runtime.js";\nimport * as S from "../../client/generated/schemas.js";\n\n`;
-  out += `export { ActionError } from "../runtime.js";\n\n`;
+  out += `export { ActionError } from "../runtime.js";\nexport type { Ctx, Principal } from "../runtime.js";\n\n`;
   out += `/** Scope key every action in "${service}" receives. */\nexport type Scope = ${scopeType};\n\n`;
 
   out += `/** Roles, with implication, as declared in src/ontology/roles.ts. */\nexport const roles: Roles = ${JSON.stringify(Object.fromEntries(Object.entries(o.roles).map(([r, s]) => [r, { implies: s.implies ?? [] }])), null, 2)};\n\n`;

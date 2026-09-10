@@ -199,8 +199,8 @@ export function createRouter<Scope, Impl extends BaseImpl<Scope>>(opts: {
     const started = Date.now();
     try {
       const fn = (opts.impl as unknown as Record<string, (c: Ctx<Scope>, i: unknown) => Promise<unknown>>)[r.method];
-      if (!fn) return respond(501, { message: `${r.key} is declared but ${opts.service} has no implementation for it (impl.${r.method})` });
-      const out = await fn(ctx, parsed.data);
+      if (typeof fn !== "function") return respond(501, { message: `${r.key} is declared but ${opts.service} has no implementation for it (impl.${r.method})` });
+      const out = await fn.call(opts.impl, ctx, parsed.data); // .call: impls are usually classes
       // 6. Validate output: the declaration is the contract in both directions.
       const checked = r.output.safeParse(out);
       if (!checked.success) {
