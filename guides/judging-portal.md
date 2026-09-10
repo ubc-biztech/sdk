@@ -47,9 +47,9 @@ public judging endpoint against `api-dev`.
 
 ## Known backend gaps found while declaring this
 
-- `GET /team/feedback/{teamID}` and `GET /team/judge/feedback/{judgeID}` return **500** when there is nothing to
-  return, because the handler throws its 404 inside a `try`. The SDK surfaces `ApiError` with status 500;
-  treat it as empty. Fix in `services/teams/handler.ts` (`getTeamFeedbackScore`, `getJudgeSubmissions`).
+- `GET /team/feedback/{teamID}` and `GET /team/judge/feedback/{judgeID}` return **500 or 502** when there is nothing
+  to return, because the handler throws its 404 inside a `try` and API Gateway reports the unhandled throw as
+  502. The SDK surfaces `ApiError` with status >= 500; treat it as empty. Fix in `services/teams/handler.ts` (`getTeamFeedbackScore`, `getJudgeSubmissions`).
 - `judge.submit` rejects a score of `0` as missing (`!data.scores.metric1`). Scales must start at 1.
 - The round is global (`ROUND` record in the judging table), so two events cannot be judged at once.
 - Every judging write is unauthenticated. Anyone with the URL can set the round or submit scores.

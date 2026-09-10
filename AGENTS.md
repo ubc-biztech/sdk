@@ -61,8 +61,8 @@ const mine = await bt.registrations.list({ email: me.id });
   declare. Report it; the declaration gets fixed.
 - **Undeclared fields are stripped.** If the backend sends `foo` and the type does not have `foo`, you will
   not see `foo`. Declare it if you need it.
-- **Errors are classes.** Branch on `instanceof EventNotFoundError`, or on `err instanceof ApiError && err.status === 500`.
+- **Errors are classes.** Branch on `instanceof EventNotFoundError`, or on `err instanceof ApiError && err.status >= 500`.
   Never on a status number pulled out of a thrown object.
 - **Read the JSDoc note on `team(...).feedback()` and `judge(...).submissions()`.** The backend currently returns
-  500 when there is nothing to return; the SDK documents that rather than hiding it.
+  500 or 502 when there is nothing to return; the SDK documents that rather than hiding it.
 - Everything is typed. If you find yourself writing `as any`, the type is telling you something.

@@ -239,7 +239,7 @@ export function createClient(config: ClientConfig) {
     /** Teams at an event. `bt.teams` for collection actions, `bt.team(id)` for judging actions on one team. */
     team: (id: string) => ({
       /**
-       * All judge submissions for this team, grouped by round. Note: when the team has no feedback the backend currently returns HTTP 500 (it throws its 404 inside a try). Catch ApiError with status 500 and treat it as empty until that is fixed.
+       * All judge submissions for this team, grouped by round. Note: when the team has no feedback the backend currently returns HTTP 500 or 502 (it throws its 404 inside a try, and API Gateway reports the unhandled throw as 502). Catch ApiError with status >= 500 and treat it as empty until that is fixed.
        * 
        * Auth: `public` — No token required. Anyone on the internet.
        * Route: `GET /team/feedback/{id}`
@@ -264,7 +264,7 @@ export function createClient(config: ClientConfig) {
        */
       currentTeam: () => rt.call<S.JudgeCurrentTeamOutput>(meta["judge.currentTeam"], { judgeID }),
       /**
-       * Everything this judge has submitted, grouped by round. Note: with no submissions the backend currently returns HTTP 500 (it throws its 404 inside a try). Catch ApiError with status 500 and treat it as empty until that is fixed.
+       * Everything this judge has submitted, grouped by round. Note: with no submissions the backend currently returns HTTP 500 or 502 (it throws its 404 inside a try, and API Gateway reports the unhandled throw as 502). Catch ApiError with status >= 500 and treat it as empty until that is fixed.
        * 
        * Auth: `public` — No token required. Anyone on the internet.
        * Route: `GET /team/judge/feedback/{judgeID}`

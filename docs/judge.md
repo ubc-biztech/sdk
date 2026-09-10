@@ -19,7 +19,7 @@ The team this judge is currently assigned to.
 
 ## `bt.judge(judgeID).submissions()`
 
-Everything this judge has submitted, grouped by round. Note: with no submissions the backend currently returns HTTP 500 (it throws its 404 inside a try). Catch ApiError with status 500 and treat it as empty until that is fixed.
+Everything this judge has submitted, grouped by round. Note: with no submissions the backend currently returns HTTP 500 or 502 (it throws its 404 inside a try, and API Gateway reports the unhandled throw as 502). Catch ApiError with status >= 500 and treat it as empty until that is fixed.
 
 - **Auth:** `public`
 - **Route:** `GET /team/judge/feedback/{judgeID}`

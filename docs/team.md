@@ -153,7 +153,7 @@ Add (or subtract, with a negative number) points to the team a user belongs to.
 
 ## `bt.team(id).feedback()`
 
-All judge submissions for this team, grouped by round. Note: when the team has no feedback the backend currently returns HTTP 500 (it throws its 404 inside a try). Catch ApiError with status 500 and treat it as empty until that is fixed.
+All judge submissions for this team, grouped by round. Note: when the team has no feedback the backend currently returns HTTP 500 or 502 (it throws its 404 inside a try, and API Gateway reports the unhandled throw as 502). Catch ApiError with status >= 500 and treat it as empty until that is fixed.
 
 - **Auth:** `public`
 - **Route:** `GET /team/feedback/{id}`
