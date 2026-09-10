@@ -118,7 +118,7 @@ describe("chained client", () => {
 describe("scoped resources", () => {
   const ok = (body: unknown) => fake(200, body);
   it("scope key flows into path params of every nested action", async () => {
-    const { calls, fetch } = ok({ eventName: "HH", phase: "prelim", perTeamJudges: 2, finalsTopN: 5, finalsTeamIds: [], finalsJudgeIds: [], resultsPublic: false, updatedAt: "t" });
+    const { calls, fetch } = ok({ eventName: "HH", phase: "prelim", perTeamJudges: 2, finalsTopN: 5, finalsTeamIds: [], finalsJudgeIds: [], showTeamFeedback: false, allowJudgeSeeOthers: true, anonymizeTeams: false, lockSubmissions: false, maxImages: 10, updatedAt: "t" });
     await createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).settings.get();
     expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/settings");
   });
