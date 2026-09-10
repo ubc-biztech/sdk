@@ -1,0 +1,57 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 9 * * *'   # daily drift check against api-dev
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      # The generator runs here and nowhere else. If the committed output is stale, fail.
+      - run: npm run gen
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: git diff --exit-code -- src/client/generated docs || (echo "::error::generated output is stale; run npm run gen and commit" && exit 1)
+      # The package version bump must be at least what the declaration diff requires.
+      - name: semver check
+        if: github.event_name == 'pull_request'
+        run: |
+          git show ${{ github.event.pull_request.base.sha }}:src/client/generated/ontology.json > /tmp/base-ontology.json
+          git show ${{ github.event.pull_request.base.sha }}:package.json > /tmp/base-package.json
+          npx tsx src/check/semver.ts /tmp/base-ontology.json --enforce /tmp/base-package.json
+
+  # Proves the declaration against api-dev. Read-only, public actions only.
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts
+      - run: npm run test:contract
+
+  publish:
+    needs: [verify, contract]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions: { contents: read, packages: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, registry-url: https://npm.pkg.github.com, scope: "@ubcbiztech" }
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: publish if new version
+        env: { NODE_AUTH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
+        run: |
+          V=$(node -p "require('./package.json').version")
+          if npm view "@ubcbiztech/sdk@$V" version >/dev/null 2>&1; then echo "already published $V"; else npm publish; fi

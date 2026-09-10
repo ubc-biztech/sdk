@@ -1,0 +1,1441 @@
+{
+  "roles": {
+    "public": {
+      "description": "No token required. Anyone on the internet."
+    },
+    "authenticated": {
+      "description": "Any valid Cognito JWT for the environment's user pool."
+    },
+    "member": {
+      "description": "Authenticated, and the caller's biztechUsers record has isMember === true."
+    },
+    "admin": {
+      "description": "Today: caller's email ends with @ubcbiztech.com. Intended: Cognito group `admin`."
+    }
+  },
+  "entities": {
+    "Event": {
+      "name": "Event",
+      "description": "A BizTech event. Identified by the pair (id, year): the same id recurs across years, e.g. `blueprint` 2024 and 2025. Stored in biztechEvents<stage>.",
+      "storage": {
+        "table": "biztechEvents",
+        "pk": "id",
+        "sk": "year"
+      },
+      "fields": {
+        "id": {
+          "kind": "string",
+          "description": "URL slug, unique within a year. Lower-case, no spaces."
+        },
+        "year": {
+          "kind": "integer",
+          "description": "Calendar year of the event. Together with `id` this is the primary key."
+        },
+        "ename": {
+          "kind": "string",
+          "description": "Display name."
+        },
+        "description": {
+          "kind": "string",
+          "optional": true,
+          "description": "Long-form description shown on the event page. Markdown-ish free text."
+        },
+        "partnerDescription": {
+          "kind": "string",
+          "optional": true,
+          "description": "Description shown to partner/company attendees."
+        },
+        "elocation": {
+          "kind": "string",
+          "optional": true,
+          "description": "Human-readable venue."
+        },
+        "startDate": {
+          "kind": "string",
+          "description": "ISO-8601 timestamp, UTC."
+        },
+        "endDate": {
+          "kind": "string",
+          "description": "ISO-8601 timestamp, UTC."
+        },
+        "deadline": {
+          "kind": "string",
+          "optional": true,
+          "description": "Registration deadline, ISO-8601 UTC. Registration is closed after this."
+        },
+        "capac": {
+          "kind": "integer",
+          "description": "Capacity. Registrations beyond this are waitlisted."
+        },
+        "imageUrl": {
+          "kind": "string",
+          "optional": true,
+          "description": "Thumbnail/hero image URL."
+        },
+        "isPublished": {
+          "kind": "boolean",
+          "description": "Visible to members. Unpublished events are only visible to admins."
+        },
+        "isCompleted": {
+          "kind": "boolean",
+          "optional": true,
+          "description": "Event has happened; used to move it to the past-events list."
+        },
+        "isApplicationBased": {
+          "kind": "boolean",
+          "optional": true,
+          "description": "Registrations are applications that an admin accepts or rejects, rather than first-come."
+        },
+        "nonBizTechAllowed": {
+          "kind": "boolean",
+          "optional": true,
+          "description": "Non-members may register."
+        },
+        "pricing": {
+          "kind": "object",
+          "fields": {
+            "members": {
+              "kind": "number",
+              "optional": true,
+              "description": "Price in CAD for members. 0 or absent means free."
+            },
+            "nonMembers": {
+              "kind": "number",
+              "optional": true,
+              "description": "Price in CAD for non-members. Absent means non-members cannot register."
+            }
+          },
+          "optional": true,
+          "description": "Ticket prices in CAD."
+        },
+        "registrationQuestions": {
+          "kind": "array",
+          "items": {
+            "kind": "object",
+            "fields": {
+              "questionId": {
+                "kind": "string",
+                "description": "Stable id; the key used in Registration.dynamicResponses."
+              },
+              "label": {
+                "kind": "string",
+                "description": "Question text."
+              },
+              "type": {
+                "kind": "string",
+                "description": "Widget type, e.g. TEXT, SELECT, CHECKBOX, UPLOAD. Not an enum today."
+              },
+              "required": {
+                "kind": "boolean",
+                "description": "Answer is mandatory."
+              },
+              "choices": {
+                "kind": "array",
+                "items": {
+                  "kind": "string",
+                  "description": "One option."
+                },
+                "optional": true,
+                "description": "Options for SELECT/CHECKBOX questions."
+              },
+              "charLimit": {
+                "kind": "integer",
+                "optional": true,
+                "description": "Max answer length for text questions."
+              },
+              "questionImageUrl": {
+                "kind": "string",
+                "optional": true,
+                "description": "Optional image shown with the question."
+              }
+            },
+            "description": "One registration form question."
+          },
+          "optional": true,
+          "description": "Custom registration form for attendees."
+        },
+        "partnerRegistrationQuestions": {
+          "kind": "json",
+          "optional": true,
+          "description": "Same shape as registrationQuestions, for partners. Declared loosely until it is used through the SDK."
+        },
+        "feedback": {
+          "kind": "string",
+          "optional": true,
+          "description": "Legacy feedback-form link. Superseded by attendeeFeedbackQuestions."
+        },
+        "attendeeFeedbackEnabled": {
+          "kind": "boolean",
+          "optional": true,
+          "description": "Attendee feedback form is open."
+        },
+        "partnerFeedbackEnabled": {
+          "kind": "boolean",
+          "optional": true,
+          "description": "Partner feedback form is open."
+        },
+        "createdAt": {
+          "kind": "integer",
+          "description": "Epoch milliseconds."
+        },
+        "updatedAt": {
+          "kind": "integer",
+          "optional": true,
+          "description": "Epoch milliseconds."
+        }
+      }
+    },
+    "EventCounts": {
+      "name": "EventCounts",
+      "description": "Registration tallies for one event, as returned by `GET /events/{id}/{year}?count=true`.",
+      "fields": {
+        "registeredCount": {
+          "kind": "integer",
+          "description": "Registrations with status registered."
+        },
+        "checkedInCount": {
+          "kind": "integer",
+          "description": "Registrations that have checked in."
+        },
+        "waitlistCount": {
+          "kind": "integer",
+          "description": "Registrations on the waitlist."
+        },
+        "dynamicCounts": {
+          "kind": "json",
+          "optional": true,
+          "description": "Per-question answer tallies, keyed by questionId. Shape varies by question type."
+        }
+      }
+    },
+    "Registration": {
+      "name": "Registration",
+      "description": "One user's registration for one event. Keyed by the user's email (`id`) and the composite `eventID;year` string, which is the literal attribute name in DynamoDB.",
+      "storage": {
+        "table": "biztechRegistrations",
+        "pk": "id",
+        "sk": "eventID;year"
+      },
+      "fields": {
+        "id": {
+          "kind": "string",
+          "description": "Registrant's email, lower-case. Joins to User.id."
+        },
+        "eventID;year": {
+          "kind": "string",
+          "description": "Composite key `<eventId>;<year>`, e.g. `blueprint;2026`. Yes, the semicolon is in the attribute name."
+        },
+        "fname": {
+          "kind": "string",
+          "optional": true,
+          "description": "First name at registration time."
+        },
+        "registrationStatus": {
+          "kind": "string",
+          "description": "One of registered, checkedIn, waitlist, cancelled, incomplete. Free string on the wire; not enforced server-side."
+        },
+        "applicationStatus": {
+          "kind": "string",
+          "optional": true,
+          "description": "For application-based events: accepted, rejected, reviewing, waitlist."
+        },
+        "isPartner": {
+          "kind": "boolean",
+          "optional": true,
+          "description": "Registered through the partner/company flow. Judges are partner registrations."
+        },
+        "basicInformation": {
+          "kind": "json",
+          "optional": true,
+          "description": "Name, year, faculty, diet, etc. Shape differs for attendee vs partner; declared loosely for now."
+        },
+        "dynamicResponses": {
+          "kind": "json",
+          "optional": true,
+          "description": "Answers keyed by Event.registrationQuestions[].questionId."
+        },
+        "points": {
+          "kind": "integer",
+          "optional": true,
+          "description": "Gamification points earned at the event."
+        },
+        "scannedQRs": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "QR id."
+          },
+          "optional": true,
+          "description": "QR codes this registrant has scanned."
+        },
+        "studentId": {
+          "kind": "string",
+          "optional": true,
+          "description": "UBC student number as entered."
+        },
+        "checkoutLink": {
+          "kind": "string",
+          "optional": true,
+          "description": "Stripe checkout URL while payment is pending."
+        },
+        "createdAt": {
+          "kind": "integer",
+          "optional": true,
+          "description": "Epoch milliseconds."
+        },
+        "updatedAt": {
+          "kind": "integer",
+          "optional": true,
+          "description": "Epoch milliseconds."
+        }
+      }
+    },
+    "User": {
+      "name": "User",
+      "description": "A BizTech account, keyed by email. Created on first sign-in. Membership is a paid annual flag on this record.",
+      "storage": {
+        "table": "biztechUsers",
+        "pk": "id"
+      },
+      "fields": {
+        "id": {
+          "kind": "string",
+          "description": "Email, lower-case. Primary key."
+        },
+        "fname": {
+          "kind": "string",
+          "optional": true,
+          "description": "First name."
+        },
+        "lname": {
+          "kind": "string",
+          "optional": true,
+          "description": "Last name."
+        },
+        "studentId": {
+          "kind": "string",
+          "optional": true,
+          "description": "UBC student number."
+        },
+        "faculty": {
+          "kind": "string",
+          "optional": true,
+          "description": "Faculty as entered."
+        },
+        "major": {
+          "kind": "string",
+          "optional": true,
+          "description": "Major as entered."
+        },
+        "year": {
+          "kind": "string",
+          "optional": true,
+          "description": "Study year as entered, e.g. `3rd Year`. Free text."
+        },
+        "isMember": {
+          "kind": "boolean",
+          "optional": true,
+          "description": "Has an active paid membership. This is the docs' `member` role."
+        },
+        "admin": {
+          "kind": "boolean",
+          "optional": true,
+          "description": "Set at creation from the email domain. Not read for authorization anywhere today."
+        },
+        "favedEventsID": {
+          "kind": "json",
+          "optional": true,
+          "description": "Array of `eventId;year` strings the user favourited."
+        },
+        "createdAt": {
+          "kind": "integer",
+          "optional": true,
+          "description": "Epoch milliseconds."
+        },
+        "updatedAt": {
+          "kind": "integer",
+          "optional": true,
+          "description": "Epoch milliseconds."
+        }
+      }
+    },
+    "Team": {
+      "name": "Team",
+      "description": "A team of registrants at one event (hackathons, case comps). Keyed by a UUID and the composite `eventID;year`. Stored in biztechTeams<stage>.",
+      "storage": {
+        "table": "biztechTeams",
+        "pk": "id",
+        "sk": "eventID;year"
+      },
+      "fields": {
+        "id": {
+          "kind": "string",
+          "description": "UUID."
+        },
+        "teamName": {
+          "kind": "string",
+          "description": "Display name, chosen by the team."
+        },
+        "eventID;year": {
+          "kind": "string",
+          "description": "Composite key `<eventId>;<year>`."
+        },
+        "memberIDs": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Member email."
+          },
+          "optional": true,
+          "description": "Member emails. Omitted from `teams.list` for non-admin callers."
+        },
+        "memberNames": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Member first name."
+          },
+          "optional": true,
+          "description": "Member first names, parallel to memberIDs when present."
+        },
+        "scannedQRs": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "QR id."
+          },
+          "optional": true,
+          "description": "QR codes any member has scanned."
+        },
+        "points": {
+          "kind": "integer",
+          "optional": true,
+          "description": "Points earned."
+        },
+        "pointsSpent": {
+          "kind": "integer",
+          "optional": true,
+          "description": "Points spent in the event store."
+        },
+        "transactions": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Transaction id."
+          },
+          "optional": true,
+          "description": "Store transaction ids."
+        },
+        "inventory": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Item id."
+          },
+          "optional": true,
+          "description": "Items bought."
+        },
+        "submission": {
+          "kind": "string",
+          "optional": true,
+          "description": "Submission link (Devpost, GitHub, …). Empty string when none."
+        },
+        "metadata": {
+          "kind": "json",
+          "optional": true,
+          "description": "Free-form per-event data."
+        },
+        "funding": {
+          "kind": "number",
+          "optional": true,
+          "description": "BTX funding, if applicable."
+        }
+      }
+    },
+    "JudgeScores": {
+      "name": "JudgeScores",
+      "description": "A judge's five metric scores for one team in one round. The backend has exactly five numbered metrics; what each means is defined by the event's rubric, not the API.",
+      "fields": {
+        "metric1": {
+          "kind": "number",
+          "description": "Score for rubric criterion 1."
+        },
+        "metric2": {
+          "kind": "number",
+          "description": "Score for rubric criterion 2."
+        },
+        "metric3": {
+          "kind": "number",
+          "description": "Score for rubric criterion 3."
+        },
+        "metric4": {
+          "kind": "number",
+          "description": "Score for rubric criterion 4."
+        },
+        "metric5": {
+          "kind": "number",
+          "description": "Score for rubric criterion 5."
+        }
+      }
+    },
+    "JudgeSubmission": {
+      "name": "JudgeSubmission",
+      "description": "One judge's scores and feedback for one team in one round, as returned by the feedback endpoints.",
+      "fields": {
+        "judgeID": {
+          "kind": "string",
+          "description": "Judge's email. Judges are partner registrations (`Registration.isPartner`)."
+        },
+        "judgeName": {
+          "kind": "string",
+          "optional": true,
+          "description": "Judge display name, if set at submission."
+        },
+        "scores": {
+          "kind": "ref",
+          "entity": "JudgeScores",
+          "optional": true,
+          "description": "The five metric scores."
+        },
+        "feedback": {
+          "kind": "json",
+          "optional": true,
+          "description": "Written feedback. A string or an object keyed by criterion; both occur."
+        },
+        "createdAt": {
+          "kind": "string",
+          "optional": true,
+          "description": "ISO-8601 timestamp of submission."
+        },
+        "teamName": {
+          "kind": "string",
+          "optional": true,
+          "description": "Team name at submission time."
+        }
+      }
+    },
+    "NormalizedTeamScore": {
+      "name": "NormalizedTeamScore",
+      "description": "A team's aggregate for the current round, with judge scores z-normalized so a harsh judge and a generous judge count equally.",
+      "fields": {
+        "teamID": {
+          "kind": "string",
+          "description": "`<teamId>;<round>` — the composite feedback key, NOT the bare team id. Split on `;` to get the team."
+        },
+        "teamName": {
+          "kind": "string",
+          "description": "Team name."
+        },
+        "zScoreWeighted": {
+          "kind": "number",
+          "description": "Weighted mean of z-scored metrics across judges. Higher is better."
+        },
+        "judges": {
+          "kind": "array",
+          "items": {
+            "kind": "string",
+            "description": "Judge email."
+          },
+          "description": "Judges who scored this team."
+        },
+        "originalResponses": {
+          "kind": "array",
+          "items": {
+            "kind": "object",
+            "fields": {
+              "judge": {
+                "kind": "string",
+                "description": "Judge email."
+              },
+              "metric1": {
+                "kind": "number",
+                "description": "Raw score."
+              },
+              "metric2": {
+                "kind": "number",
+                "description": "Raw score."
+              },
+              "metric3": {
+                "kind": "number",
+                "description": "Raw score."
+              },
+              "metric4": {
+                "kind": "number",
+                "description": "Raw score."
+              },
+              "metric5": {
+                "kind": "number",
+                "description": "Raw score."
+              }
+            },
+            "description": "One judge's raw scores."
+          },
+          "description": "Raw per-judge scores before normalization."
+        }
+      }
+    }
+  },
+  "resources": {
+    "event": {
+      "singular": "event",
+      "plural": "events",
+      "description": "Events. `bt.events` for the collection, `bt.event(id, year)` for one.",
+      "entity": "Event",
+      "key": {
+        "id": {
+          "kind": "string",
+          "description": "Event id (slug)."
+        },
+        "year": {
+          "kind": "integer",
+          "description": "Event year."
+        }
+      },
+      "collection": {
+        "list": {
+          "errors": {},
+          "description": "All events across all years, sorted by startDate. Public; unpublished events are included, so filter on isPublished for member-facing UI. Returns the overview projection: description and question arrays are absent.",
+          "auth": "public",
+          "input": {
+            "id": {
+              "kind": "string",
+              "optional": true,
+              "description": "Restrict to events with this id (all years)."
+            }
+          },
+          "output": {
+            "kind": "array",
+            "items": {
+              "kind": "ref",
+              "entity": "Event",
+              "description": "An event, overview projection."
+            },
+            "description": "Events, ascending by startDate."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/events",
+            "query": [
+              "id"
+            ]
+          }
+        }
+      },
+      "instance": {
+        "get": {
+          "errors": {
+            "EventNotFound": {
+              "status": 404,
+              "description": "No event with that id and year."
+            }
+          },
+          "description": "The full event record.",
+          "auth": "public",
+          "output": {
+            "kind": "ref",
+            "entity": "Event",
+            "description": "The event."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/events/{id}/{year}"
+          }
+        },
+        "counts": {
+          "errors": {
+            "EventNotFound": {
+              "status": 404,
+              "description": "No event with that id and year."
+            }
+          },
+          "description": "Registration tallies.",
+          "auth": "public",
+          "output": {
+            "kind": "ref",
+            "entity": "EventCounts",
+            "description": "The tallies."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/events/{id}/{year}",
+            "fixedQuery": {
+              "count": "true"
+            }
+          }
+        }
+      },
+      "links": {
+        "registrations": {
+          "description": "Every registration for this event, including waitlisted and cancelled. Requires a token.",
+          "via": "registrations.list",
+          "map": {
+            "eventID": "id",
+            "year": "year"
+          }
+        },
+        "teams": {
+          "description": "Every team formed for this event. Requires a token; member emails are only included for admins.",
+          "via": "teams.list",
+          "map": {
+            "eventID": "id",
+            "year": "year"
+          }
+        }
+      }
+    },
+    "registration": {
+      "singular": "registration",
+      "plural": "registrations",
+      "description": "Registrations. Read-only through the SDK for now; writes still go through the registration form.",
+      "entity": "Registration",
+      "key": {},
+      "collection": {
+        "list": {
+          "errors": {
+            "MissingFilter": {
+              "status": 406,
+              "description": "Neither email nor eventID+year was given."
+            }
+          },
+          "description": "Registrations filtered by registrant email and/or event. At least one of `email` or the (`eventID`, `year`) pair is required; the backend rejects an empty query. Non-admins receive only their own.",
+          "auth": "authenticated",
+          "input": {
+            "email": {
+              "kind": "string",
+              "optional": true,
+              "description": "Registrant email. Case-insensitive."
+            },
+            "eventID": {
+              "kind": "string",
+              "optional": true,
+              "description": "Event id (slug). Must be paired with `year`."
+            },
+            "year": {
+              "kind": "integer",
+              "optional": true,
+              "description": "Event year. Must be paired with `eventID`."
+            }
+          },
+          "output": {
+            "kind": "array",
+            "items": {
+              "kind": "ref",
+              "entity": "Registration",
+              "description": "A registration."
+            },
+            "description": "Matching registrations. Empty array when none."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/registrations",
+            "query": [
+              "email",
+              "eventID",
+              "year"
+            ]
+          }
+        }
+      },
+      "instance": {},
+      "links": {}
+    },
+    "me": {
+      "singular": "me",
+      "description": "The signed-in user, resolved from the JWT. A singleton: `bt.me.get()`.",
+      "entity": "User",
+      "key": {},
+      "collection": {},
+      "instance": {
+        "get": {
+          "errors": {
+            "UserNotFound": {
+              "status": 404,
+              "description": "No user record for the caller's email yet."
+            }
+          },
+          "description": "The caller's own user record.",
+          "auth": "authenticated",
+          "output": {
+            "kind": "ref",
+            "entity": "User",
+            "description": "The caller."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/users/self"
+          }
+        }
+      },
+      "links": {}
+    },
+    "user": {
+      "singular": "user",
+      "plural": "users",
+      "description": "Users by email. `bt.user(email).get()` is admin-only; non-admins should use `bt.me`.",
+      "entity": "User",
+      "key": {
+        "email": {
+          "kind": "string",
+          "description": "The user's email."
+        }
+      },
+      "collection": {},
+      "instance": {
+        "get": {
+          "errors": {
+            "UserNotFound": {
+              "status": 404,
+              "description": "No user with that email."
+            }
+          },
+          "description": "One user by email. Admins only; a non-admin caller gets their own record back regardless of the email given.",
+          "auth": "admin",
+          "output": {
+            "kind": "ref",
+            "entity": "User",
+            "description": "The user."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/users/{email}"
+          }
+        }
+      },
+      "links": {}
+    },
+    "team": {
+      "singular": "team",
+      "plural": "teams",
+      "description": "Teams at an event. `bt.teams` for collection actions, `bt.team(id)` for judging actions on one team.",
+      "entity": "Team",
+      "key": {
+        "id": {
+          "kind": "string",
+          "description": "Team UUID."
+        }
+      },
+      "collection": {
+        "list": {
+          "errors": {},
+          "description": "All teams for an event. Member emails (`memberIDs`) are stripped unless the caller is an admin.",
+          "auth": "authenticated",
+          "input": {
+            "eventID": {
+              "kind": "string",
+              "description": "Event id (slug)."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year."
+            }
+          },
+          "output": {
+            "kind": "array",
+            "items": {
+              "kind": "ref",
+              "entity": "Team",
+              "description": "A team."
+            },
+            "description": "Teams for the event."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/team/{eventID}/{year}"
+          }
+        },
+        "scores": {
+          "errors": {},
+          "description": "Every team's normalized aggregate score for the current judging round. Public. Empty array before any judge has submitted.",
+          "auth": "public",
+          "output": {
+            "kind": "array",
+            "items": {
+              "kind": "ref",
+              "entity": "NormalizedTeamScore",
+              "description": "One team's aggregate."
+            },
+            "description": "Aggregates, unordered."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/team/scores-all"
+          }
+        },
+        "forUser": {
+          "errors": {
+            "TeamNotFound": {
+              "status": 404,
+              "description": "User is not on a team for this event."
+            }
+          },
+          "description": "The team a user belongs to at an event.",
+          "auth": "public",
+          "input": {
+            "user_id": {
+              "kind": "string",
+              "description": "Member email."
+            },
+            "eventID": {
+              "kind": "string",
+              "description": "Event id (slug)."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Confirmation."
+              },
+              "response": {
+                "kind": "ref",
+                "entity": "Team",
+                "description": "The team."
+              }
+            },
+            "description": "Wrapper around the team."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/team/getTeamFromUserID"
+          }
+        },
+        "create": {
+          "errors": {},
+          "description": "Create a team with the given members. Members must be registered for the event.",
+          "auth": "authenticated",
+          "input": {
+            "team_name": {
+              "kind": "string",
+              "description": "Team name."
+            },
+            "eventID": {
+              "kind": "string",
+              "description": "Event id (slug)."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year."
+            },
+            "memberIDs": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Member email."
+              },
+              "description": "Initial members' emails."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Confirmation."
+              },
+              "response": {
+                "kind": "ref",
+                "entity": "Team",
+                "description": "The new team."
+              }
+            },
+            "description": "Wrapper around the created team."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/team/make"
+          }
+        },
+        "join": {
+          "errors": {},
+          "description": "Add a member to an existing team.",
+          "auth": "authenticated",
+          "input": {
+            "memberID": {
+              "kind": "string",
+              "description": "Joining member's email."
+            },
+            "eventID": {
+              "kind": "string",
+              "description": "Event id (slug)."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year."
+            },
+            "teamID": {
+              "kind": "string",
+              "description": "Team UUID to join."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Confirmation; `response` echoes the input."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/team/join"
+          }
+        },
+        "leave": {
+          "errors": {},
+          "description": "Remove a member from their team.",
+          "auth": "authenticated",
+          "input": {
+            "memberID": {
+              "kind": "string",
+              "description": "Leaving member's email."
+            },
+            "eventID": {
+              "kind": "string",
+              "description": "Event id (slug)."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Confirmation; `response` echoes the input."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/team/leave"
+          }
+        },
+        "rename": {
+          "errors": {},
+          "description": "Rename the team a user belongs to.",
+          "auth": "public",
+          "input": {
+            "user_id": {
+              "kind": "string",
+              "description": "A member's email."
+            },
+            "eventID": {
+              "kind": "string",
+              "description": "Event id (slug)."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year."
+            },
+            "team_name": {
+              "kind": "string",
+              "description": "New name."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Confirmation."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/team/changeTeamName"
+          }
+        },
+        "addPoints": {
+          "errors": {
+            "TeamNotFound": {
+              "status": 404,
+              "description": "User is not on a team for this event."
+            }
+          },
+          "description": "Add (or subtract, with a negative number) points to the team a user belongs to.",
+          "auth": "public",
+          "input": {
+            "user_id": {
+              "kind": "string",
+              "description": "A member's email."
+            },
+            "eventID": {
+              "kind": "string",
+              "description": "Event id (slug)."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year."
+            },
+            "change_points": {
+              "kind": "integer",
+              "description": "Delta. Negative subtracts."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Confirmation."
+              },
+              "updatedPoints": {
+                "kind": "integer",
+                "description": "Team's new total."
+              }
+            },
+            "description": "New total."
+          },
+          "route": {
+            "method": "PUT",
+            "path": "/team/points"
+          }
+        }
+      },
+      "instance": {
+        "feedback": {
+          "errors": {},
+          "description": "All judge submissions for this team, grouped by round. Note: when the team has no feedback the backend currently returns HTTP 500 (it throws its 404 inside a try). Catch ApiError with status 500 and treat it as empty until that is fixed.",
+          "auth": "public",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Confirmation."
+              },
+              "scores": {
+                "kind": "record",
+                "values": {
+                  "kind": "array",
+                  "items": {
+                    "kind": "ref",
+                    "entity": "JudgeSubmission",
+                    "description": "One judge's submission."
+                  },
+                  "description": "Submissions in this round."
+                },
+                "description": "Keyed by round, e.g. `\"1\"`."
+              }
+            },
+            "description": "Submissions by round."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/team/feedback/{id}"
+          }
+        },
+        "assignJudges": {
+          "errors": {
+            "AllJudgesDone": {
+              "status": 409,
+              "description": "Every listed judge has already scored this team this round."
+            }
+          },
+          "description": "Point the given judges at this team for the current round. Judges who already scored this team in this round are skipped.",
+          "auth": "public",
+          "input": {
+            "judgeIDs": {
+              "kind": "array",
+              "items": {
+                "kind": "string",
+                "description": "Judge email."
+              },
+              "description": "Judges to assign."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Confirmation."
+          },
+          "route": {
+            "method": "PUT",
+            "path": "/team/judge/currentTeam/{id}"
+          }
+        }
+      },
+      "links": {}
+    },
+    "judge": {
+      "singular": "judge",
+      "description": "A judge, identified by email. Judges are partner registrations for the event; there is no separate judge record. `bt.judge(email)`.",
+      "key": {
+        "judgeID": {
+          "kind": "string",
+          "description": "Judge's email."
+        }
+      },
+      "collection": {},
+      "instance": {
+        "currentTeam": {
+          "errors": {},
+          "description": "The team this judge is currently assigned to.",
+          "auth": "public",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Confirmation."
+              },
+              "currentTeamID": {
+                "kind": "string",
+                "description": "Assigned team UUID."
+              },
+              "currentTeamName": {
+                "kind": "string",
+                "nullable": true,
+                "description": "Team name, or null if the team record is missing."
+              }
+            },
+            "description": "Current assignment."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/team/judge/currentTeamID/{judgeID}"
+          }
+        },
+        "submissions": {
+          "errors": {},
+          "description": "Everything this judge has submitted, grouped by round. Note: with no submissions the backend currently returns HTTP 500 (it throws its 404 inside a try). Catch ApiError with status 500 and treat it as empty until that is fixed.",
+          "auth": "public",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Confirmation."
+              },
+              "scores": {
+                "kind": "record",
+                "values": {
+                  "kind": "array",
+                  "items": {
+                    "kind": "object",
+                    "fields": {
+                      "round": {
+                        "kind": "string",
+                        "description": "Round number as a string."
+                      },
+                      "judgeID": {
+                        "kind": "string",
+                        "description": "Judge email."
+                      },
+                      "judgeName": {
+                        "kind": "string",
+                        "optional": true,
+                        "description": "Judge display name."
+                      },
+                      "scores": {
+                        "kind": "ref",
+                        "entity": "JudgeScores",
+                        "optional": true,
+                        "description": "The five metrics."
+                      },
+                      "feedback": {
+                        "kind": "json",
+                        "optional": true,
+                        "description": "Written feedback; string or object."
+                      },
+                      "teamID": {
+                        "kind": "string",
+                        "description": "Team UUID."
+                      },
+                      "teamName": {
+                        "kind": "string",
+                        "optional": true,
+                        "description": "Team name at submission."
+                      },
+                      "createdAt": {
+                        "kind": "string",
+                        "optional": true,
+                        "description": "ISO-8601."
+                      }
+                    },
+                    "description": "One submission."
+                  },
+                  "description": "Submissions in this round."
+                },
+                "description": "Keyed by round."
+              }
+            },
+            "description": "Submissions by round."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/team/judge/feedback/{judgeID}"
+          }
+        },
+        "submit": {
+          "errors": {
+            "InvalidScores": {
+              "status": 400,
+              "description": "A metric is missing or zero."
+            },
+            "NotAJudge": {
+              "status": 409,
+              "description": "No partner registration for this judge at this event, or already submitted for this team this round."
+            }
+          },
+          "description": "Submit scores for a team in the *current* round (the round is read server-side from `bt.judgingRound`). All five metrics must be non-zero; the backend treats 0 as missing. One submission per judge per team per round.",
+          "auth": "public",
+          "input": {
+            "teamID": {
+              "kind": "string",
+              "description": "Team UUID."
+            },
+            "eventID": {
+              "kind": "string",
+              "description": "Event id (slug)."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year."
+            },
+            "scores": {
+              "kind": "ref",
+              "entity": "JudgeScores",
+              "description": "Five metric scores, all non-zero."
+            },
+            "feedback": {
+              "kind": "json",
+              "optional": true,
+              "description": "Written feedback; string or object keyed by criterion."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Confirmation."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/team/judge/feedback"
+          }
+        },
+        "updateSubmission": {
+          "errors": {},
+          "description": "Edit an existing submission for a team and round.",
+          "auth": "public",
+          "input": {
+            "teamID": {
+              "kind": "string",
+              "description": "Team UUID."
+            },
+            "round": {
+              "kind": "string",
+              "description": "Round the submission was made in."
+            },
+            "scores": {
+              "kind": "ref",
+              "entity": "JudgeScores",
+              "optional": true,
+              "description": "Replacement scores."
+            },
+            "feedback": {
+              "kind": "json",
+              "optional": true,
+              "description": "Replacement feedback."
+            },
+            "judgeName": {
+              "kind": "string",
+              "optional": true,
+              "description": "Replacement judge display name."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Confirmation."
+          },
+          "route": {
+            "method": "PUT",
+            "path": "/team/judge/feedback"
+          }
+        }
+      },
+      "links": {}
+    },
+    "judgingRound": {
+      "singular": "judgingRound",
+      "description": "The single global judging round counter. A singleton: `bt.judgingRound.get()`. Note it is global, not per event.",
+      "key": {},
+      "collection": {},
+      "instance": {
+        "get": {
+          "errors": {},
+          "description": "The current round.",
+          "auth": "public",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "round": {
+                "kind": "string",
+                "description": "Round identifier, e.g. `\"1\"`. A string on the wire."
+              }
+            },
+            "description": "Current round."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/team/round"
+          }
+        },
+        "set": {
+          "errors": {},
+          "description": "Set the current round. Affects every subsequent `judge.submit`.",
+          "auth": "public",
+          "input": {
+            "round": {
+              "kind": "string",
+              "description": "New round identifier."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "message": {
+                "kind": "string",
+                "description": "Human-readable confirmation."
+              }
+            },
+            "description": "Confirmation."
+          },
+          "route": {
+            "method": "PUT",
+            "path": "/team/round/{round}"
+          }
+        }
+      },
+      "links": {}
+    }
+  }
+}
