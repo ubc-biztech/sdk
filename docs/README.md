@@ -1,4 +1,4 @@
-# @ubcbiztech/sdk — reference
+# @ubc-biztech/sdk — reference
 
 Generated from the ontology. Every fact here is also in the JSDoc; this is the same information for readers who are not in an editor.
 

@@ -1,4 +1,4 @@
-# Moving the HelloHacks judging portal onto @ubcbiztech/sdk
+# Moving the HelloHacks judging portal onto @ubc-biztech/sdk
 
 The portal (`ubc-biztech/hello-hacks-judging-portal`) keeps teams, judges, reviews and the rubric in
 Firestore and signs people in with codes. The BizTech backend already has a judging model in the `teams`

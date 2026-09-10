@@ -149,7 +149,7 @@ const outLink = (f: { kind: string; entity?: string; items?: { kind: string; ent
 export function emitDocs(o: Ontology): Record<string, string> {
   const files: Record<string, string> = {};
   const flat = flatten(o);
-  let index = `# @ubcbiztech/sdk — reference\n\nGenerated from the ontology. Every fact here is also in the JSDoc; this is the same information for readers who are not in an editor.\n\n## Roles\n\n| Role | Meaning |\n|---|---|\n`;
+  let index = `# @ubc-biztech/sdk — reference\n\nGenerated from the ontology. Every fact here is also in the JSDoc; this is the same information for readers who are not in an editor.\n\n## Roles\n\n| Role | Meaning |\n|---|---|\n`;
   for (const [r, s] of Object.entries(o.roles)) index += `| \`${r}\` | ${s.description} |\n`;
   index += `\n## Resources\n\n`;
   for (const r of Object.values(o.resources)) {

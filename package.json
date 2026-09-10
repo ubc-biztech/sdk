@@ -1,10 +1,10 @@
 {
-  "name": "@ubcbiztech/sdk",
+  "name": "@ubc-biztech/sdk",
   "version": "0.1.0",
   "description": "Typed, chained client for BizTech club data, generated from a declared ontology.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ubc-biztech/sdk.git"
+    "url": "git+https://github.com/ubc-biztech/sdk.git"
   },
   "license": "MIT",
   "type": "module",

@@ -1,8 +1,8 @@
 /**
- * @ubcbiztech/sdk — the generated client for BizTech club data.
+ * @ubc-biztech/sdk — the generated client for BizTech club data.
  *
  * ```ts
- * import { createClient } from "@ubcbiztech/sdk";
+ * import { createClient } from "@ubc-biztech/sdk";
  * const bt = createClient({ baseUrl: "https://api-dev.ubcbiztech.com", getToken });
  * const event = await bt.event("blueprint", 2026).get();
  * ```

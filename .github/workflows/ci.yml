@@ -47,11 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm, registry-url: https://npm.pkg.github.com, scope: "@ubcbiztech" }
+        with: { node-version: 22, cache: npm, registry-url: https://npm.pkg.github.com, scope: "@ubc-biztech" }
       - run: npm ci --ignore-scripts
       - run: npm run build
       - name: publish if new version
         env: { NODE_AUTH_TOKEN: "${{ secrets.GITHUB_TOKEN }}" }
         run: |
           V=$(node -p "require('./package.json').version")
-          if npm view "@ubcbiztech/sdk@$V" version >/dev/null 2>&1; then echo "already published $V"; else npm publish; fi
+          if npm view "@ubc-biztech/sdk@$V" version >/dev/null 2>&1; then echo "already published $V"; else npm publish; fi

@@ -1,68 +1,177 @@
-# @ubcbiztech/sdk
+# @ubc-biztech/sdk
 
-Typed, chained client for BizTech club data, **generated from a declared ontology**. One package, one
-data plane: every BizTech app (`bt-web`, Relay, the judging portal, companion) reads and writes through
-it, and it forwards to `api.ubcbiztech.com`.
+Typed client for BizTech club data. One call per method, one HTTP request per call, to
+`api.ubcbiztech.com`. Everything below is generated from a declared ontology, so the types, the
+error classes and the JSDoc on every method agree with each other by construction.
 
-```ts
-import { createClient } from "@ubcbiztech/sdk";
-
-const bt = createClient({ baseUrl: "https://api-dev.ubcbiztech.com", getToken });
-
-const events = await bt.events.list();
-const event  = await bt.event("blueprint", 2026).get();
-const teams  = await bt.event("blueprint", 2026).teams();          // a declared link, one call
-const round  = await bt.judgingRound.get();
-await bt.judge("judge@example.com").submit({ teamID, eventID: "hellohacks", year: 2026, scores });
-```
-
-The reasoning behind this design is in the org's `docs/bt-sdk-rfc.md`. The short version: the meaning of our
-data used to live in 19 handler files and four hand-rolled clients. Now it lives in `src/ontology/` and
-everything else is generated from it.
-
-## Status
-
-**Phase 1, incremental.** The SDK targets the *existing* REST API; nothing in `serverless-biztechapp` changes.
-Apps adopt it one call at a time. A contract test runs daily against `api-dev` and fails when the backend
-stops matching the declaration, so trust is earned by the test, not asked for.
-
-| Resource | Chain | Covers |
-|---|---|---|
-| `event` | `bt.events.list()` · `bt.event(id, year).get() / .counts() / .registrations() / .teams()` | events service |
-| `registration` | `bt.registrations.list({ email \| eventID+year })` | registrations (read) |
-| `me` / `user` | `bt.me.get()` · `bt.user(email).get()` | users |
-| `team` | `bt.teams.list/scores/forUser/create/join/leave/rename/addPoints` · `bt.team(id).feedback() / .assignJudges()` | teams |
-| `judge` | `bt.judge(email).currentTeam() / .submissions() / .submit() / .updateSubmission()` | judging |
-| `judgingRound` | `bt.judgingRound.get() / .set()` | judging |
-
-Full reference: [`docs/`](./docs/README.md) (generated). Migration guides: [`guides/`](./guides).
-
-## Installing
-
-Published to GitHub Packages on every version bump on `main`. Until your app has a registry token, install
-straight from git — the package builds itself on install:
+## Install
 
 ```sh
 npm i github:ubc-biztech/sdk zod
 ```
 
-Then in the app: `createClient({ baseUrl, getToken })` once, export it, and replace one fetch at a time.
-See [`AGENTS.md`](./AGENTS.md) for the rules and worked calls.
+Once the org's GitHub Packages registry is enabled, `npm i @ubc-biztech/sdk` works with a scoped
+`.npmrc` entry. Until then the git install builds the package on install.
 
-## Layout
+## Create a client
+
+One client per app, at startup. Export it and import it everywhere.
+
+```ts
+// src/lib/bt.ts
+import { createClient } from "@ubc-biztech/sdk";
+
+export const bt = createClient({
+  baseUrl: process.env.NEXT_PUBLIC_STAGE === "production"
+    ? "https://api.ubcbiztech.com"
+    : "https://api-dev.ubcbiztech.com",
+  // Return the Cognito ID token, or null when signed out. Omit for public-only apps.
+  getToken: async () => (await fetchAuthSession()).tokens?.idToken?.toString() ?? null,
+});
+```
+
+| Option | Type | Notes |
+|---|---|---|
+| `baseUrl` | `string` | No trailing slash. |
+| `getToken` | `() => string \| null \| Promise<…>` | Called on every request. Actions whose auth is not `public` throw `NotAuthenticatedError` before any HTTP if it returns null. |
+| `fetch` | `typeof fetch` | Override for tests or non-browser runtimes. |
+| `validateOutput` | `boolean` | Default `true`. Set `false` only in an emergency during a live event, then file the drift. |
+
+## How calls are shaped
+
+```ts
+bt.<plural>.<action>(input)              // collection:  bt.events.list()
+bt.<singular>(...key).<action>(input)    // one thing:   bt.event("blueprint", 2026).get()
+bt.<singular>(...key).<link>()           // relationship: bt.event("blueprint", 2026).teams()
+bt.<singleton>.<action>(input)           // no key:      bt.me.get(), bt.judgingRound.get()
+```
+
+Every method returns a `Promise` of a typed value. Input is validated before sending; output is
+validated after, and fields the ontology does not declare are stripped.
+
+## Reference
+
+Full per-method reference with input and output tables: [`docs/`](./docs/README.md).
+
+### Events
+
+```ts
+const events = await bt.events.list();                     // Event[], all years, includes unpublished
+const blue   = await bt.events.list({ id: "blueprint" });  // all years of one event
+const event  = await bt.event("blueprint", 2026).get();    // full record; throws EventNotFoundError
+const counts = await bt.event("blueprint", 2026).counts(); // { registeredCount, checkedInCount, waitlistCount }
+const regs   = await bt.event("blueprint", 2026).registrations(); // Registration[]  (token required)
+const teams  = await bt.event("blueprint", 2026).teams();         // Team[]          (token required)
+```
+
+`events.list` is public and returns unpublished rows too. Filter on `isPublished` for member-facing UI.
+
+### Registrations
+
+```ts
+const mine  = await bt.registrations.list({ email: "me@example.com" });
+const forEv = await bt.registrations.list({ eventID: "blueprint", year: 2026 });
+```
+
+At least one of `email` or the `eventID` + `year` pair is required. Non-admins only receive their own.
+
+### Users
+
+```ts
+const me   = await bt.me.get();                       // the signed-in user; throws UserNotFoundError
+const user = await bt.user("someone@ubc.ca").get();   // admin only
+```
+
+### Teams
+
+```ts
+const teams = await bt.teams.list({ eventID: "hellohacks", year: 2027 });   // memberIDs only for admins
+const board = await bt.teams.scores();                                      // NormalizedTeamScore[], public
+const mine  = await bt.teams.forUser({ user_id: "me@ubc.ca", eventID: "hellohacks", year: 2027 });
+
+await bt.teams.create({ team_name: "productx", eventID: "hellohacks", year: 2027, memberIDs: ["a@ubc.ca"] });
+await bt.teams.join({ memberID: "b@ubc.ca", eventID: "hellohacks", year: 2027, teamID });
+await bt.teams.leave({ memberID: "b@ubc.ca", eventID: "hellohacks", year: 2027 });
+await bt.teams.rename({ user_id: "a@ubc.ca", eventID: "hellohacks", year: 2027, team_name: "producty" });
+await bt.teams.addPoints({ user_id: "a@ubc.ca", eventID: "hellohacks", year: 2027, change_points: 10 });
+
+const fb = await bt.team(teamID).feedback();                     // { scores: { "1": JudgeSubmission[] } }
+await bt.team(teamID).assignJudges({ judgeIDs: ["j@corp.com"] }); // throws AllJudgesDoneError (409)
+```
+
+In `teams.scores()` the `teamID` field is `"<teamId>;<round>"`. Split on `;` to get the team.
+
+### Judging
+
+Judges are identified by email. They must hold a partner registration for the event.
+
+```ts
+const { round } = await bt.judgingRound.get();          // "1"; one global counter, not per event
+await bt.judgingRound.set({ round: "2" });
+
+const { currentTeamID, currentTeamName } = await bt.judge("j@corp.com").currentTeam();
+const all = await bt.judge("j@corp.com").submissions(); // { scores: { "1": [...], "2": [...] } }
+
+await bt.judge("j@corp.com").submit({
+  teamID: currentTeamID, eventID: "hellohacks", year: 2027,
+  scores: { metric1: 4, metric2: 5, metric3: 3, metric4: 4, metric5: 5 },  // all non-zero
+  feedback: "Great demo, unclear business model.",
+});                                                     // throws InvalidScoresError (400), NotAJudgeError (409)
+
+await bt.judge("j@corp.com").updateSubmission({ teamID, round: "1", feedback: "Revised." });
+```
+
+`team(...).feedback()` and `judge(...).submissions()` currently return HTTP 500 or 502 when there is nothing
+to return (a backend bug: the handler throws its 404 inside a `try`). Catch `ApiError` with `status >= 500`
+and treat it as empty until that is fixed.
+
+## Errors
+
+Every failure is a thrown class. Branch on `instanceof`, never on a status number pulled from an object.
+
+| Class | When |
+|---|---|
+| `EventNotFoundError`, `UserNotFoundError`, `TeamNotFoundError`, `MissingFilterError`, `AllJudgesDoneError`, `InvalidScoresError`, `NotAJudgeError` | A status the action declares. See each method's JSDoc. |
+| `ApiError` | Any other non-2xx. Has `.status`, `.action`, `.details`. |
+| `NotAuthenticatedError` | Action needs a token and `getToken` returned null. Thrown before any HTTP. |
+| `InputError` | Your input failed the declared schema. Thrown before any HTTP. `.details` has the issues. |
+| `ContractViolationError` | The backend returned something the ontology does not declare. Do not catch this; report it. |
+
+```ts
+import { EventNotFoundError, ApiError } from "@ubc-biztech/sdk";
+
+try {
+  return await bt.event(id, year).get();
+} catch (e) {
+  if (e instanceof EventNotFoundError) return notFound();
+  if (e instanceof ApiError && e.status >= 500) return retryLater();
+  throw e;
+}
+```
+
+## Types
+
+Every entity and every action's input and output is exported, along with its Zod schema.
+
+```ts
+import type { Event, Registration, Team, JudgeScores, User } from "@ubc-biztech/sdk";
+import { EventSchema } from "@ubc-biztech/sdk";       // z.ZodType<Event>
+```
+
+## Migrating an existing app
+
+Replace one call at a time. Keep the old fetch wrapper for everything the SDK does not cover yet, and add a
+lint rule against new uses. If the SDK does not cover an endpoint you need, the fix is a declaration in
+`src/ontology/` of this repo, not a raw fetch. See [`CONTRIBUTING.md`](./CONTRIBUTING.md), and
+[`guides/judging-portal.md`](./guides/judging-portal.md) for a worked migration.
+
+## Repo layout
 
 ```
-src/ontology/      the declaration — roles, entities, resources. THE thing to edit.
-src/ontology/dsl.ts  the vocabulary it is written in (~240 lines)
-src/gen/           the generator: template strings, no AST work (~320 lines)
-src/client/        runtime.ts + index.ts are hand-written; generated/ is not
-src/check/         semver classification of a declaration diff
-docs/              generated reference (wiped and rewritten by `npm run gen`)
-guides/            hand-written adoption guides
-test/              unit, ontology validation, semver rules, api-dev contract test
+src/ontology/   the declaration: roles, entities, resources. The thing to edit.
+src/gen/        the generator (template strings, ~320 lines)
+src/client/     runtime.ts + index.ts are hand-written; generated/ is not
+docs/           generated reference
+guides/         hand-written migration guides
+test/           unit, validation, semver rules, and the daily contract test against api-dev
 ```
-
-## Contributing
-
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). The loop is: edit `src/ontology/`, `npm run gen`,
-`npm test`, `npm run test:contract`, bump the version by what `npm run check:semver` says.

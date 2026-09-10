@@ -120,7 +120,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()
     const got = requiredBump(from, to);
     console.log(`package version: ${from} → ${to} (${got}); required: ${bump}`);
     if (rank[got] < rank[bump]) {
-      console.error(`✗ @ubcbiztech/sdk needs at least a ${bump} bump`);
+      console.error(`✗ @ubc-biztech/sdk needs at least a ${bump} bump`);
       process.exit(1);
     }
   }

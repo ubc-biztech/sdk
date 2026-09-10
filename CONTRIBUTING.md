@@ -1,4 +1,4 @@
-# Contributing to @ubcbiztech/sdk
+# Contributing to @ubc-biztech/sdk
 
 You are editing a **declaration**, not an implementation. The client, schemas, error classes and reference
 docs are all generated from `src/ontology/`.
