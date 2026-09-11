@@ -109,3 +109,16 @@ describe("class-based impl", () => {
     expect(JSON.parse(r.body).eventName).toBe("HH");
   });
 });
+
+describe("per-endpoint handlers (explicit routes)", () => {
+  it("reads path params from event.pathParameters and behaves like the router", async () => {
+    const { createHandlers } = await import("../src/server/generated/judging.js");
+    const h = createHandlers(impl as Impl, () => {});
+    const r = await h.settingsGet({ httpMethod: "GET", path: "/judging/hellohacks/2027/settings", pathParameters: { eventID: "hellohacks", year: "2027" }, headers: {}, requestContext: { requestId: "r" } });
+    expect(r.statusCode).toBe(200);
+    expect(JSON.parse(r.body).eventName).toBe("hellohacks 2027");
+    expect(r.headers["Access-Control-Allow-Credentials"]).toBe("true");
+    const denied = await h.teamsList({ httpMethod: "GET", path: "/judging/hellohacks/2027/teams", pathParameters: { eventID: "hellohacks", year: "2027" }, headers: {}, requestContext: { requestId: "r" } });
+    expect(denied.statusCode).toBe(401);
+  });
+});

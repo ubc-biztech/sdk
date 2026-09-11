@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { byService, flatten, validate } from "../ontology/dsl.js";
 import { ontology } from "../ontology/index.js";
-import { emitClient, emitDocs, emitErrors, emitSchemas, emitServer, snapshot } from "./emit.js";
+import { emitClient, emitDocs, emitErrors, emitSchemas, emitServer, emitServerlessFunctions, snapshot } from "./emit.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const outDir = process.argv[2] ?? join(root, "src", "client", "generated");
@@ -29,7 +29,10 @@ const files: Record<string, string> = {
 for (const [name, content] of Object.entries(files)) writeFileSync(join(outDir, name), content);
 for (const [name, content] of Object.entries(emitDocs(ontology))) writeFileSync(join(docsDir, name), content);
 const services = byService(ontology);
-for (const [service, actions] of services) writeFileSync(join(serverDir, `${service}.ts`), emitServer(ontology, service, actions));
+for (const [service, actions] of services) {
+  writeFileSync(join(serverDir, `${service}.ts`), emitServer(ontology, service, actions));
+  writeFileSync(join(serverDir, `${service}.functions.yml`), emitServerlessFunctions(service, actions, `${service}Handlers`));
+}
 
 const nLinks = Object.values(ontology.resources).reduce((n, r) => n + Object.keys(r.links).length, 0);
 console.log(

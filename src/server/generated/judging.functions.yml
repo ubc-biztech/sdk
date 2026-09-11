@@ -1,0 +1,303 @@
+# GENERATED from the ontology in ubc-biztech/sdk (service "judging"). Paste under `functions:`;
+# regenerate rather than edit. Each entry is one Lambda, like every other endpoint in this repo.
+  judgingSessionLogin:
+    handler: judgingHandlers.sessionLogin
+    events:
+      - http:
+          path: judging/{eventID}/{year}/session/login
+          method: post
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingSessionMe:
+    handler: judgingHandlers.sessionMe
+    events:
+      - http:
+          path: judging/{eventID}/{year}/session
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingSettingsGet:
+    handler: judgingHandlers.settingsGet
+    events:
+      - http:
+          path: judging/{eventID}/{year}/settings
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingSettingsSet:
+    handler: judgingHandlers.settingsSet
+    events:
+      - http:
+          path: judging/{eventID}/{year}/settings
+          method: put
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingRubricGet:
+    handler: judgingHandlers.rubricGet
+    events:
+      - http:
+          path: judging/{eventID}/{year}/rubric
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingRubricSet:
+    handler: judgingHandlers.rubricSet
+    events:
+      - http:
+          path: judging/{eventID}/{year}/rubric
+          method: put
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingTeamsList:
+    handler: judgingHandlers.teamsList
+    events:
+      - http:
+          path: judging/{eventID}/{year}/teams
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingTeamsCreate:
+    handler: judgingHandlers.teamsCreate
+    events:
+      - http:
+          path: judging/{eventID}/{year}/teams
+          method: post
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingTeamGet:
+    handler: judgingHandlers.teamGet
+    events:
+      - http:
+          path: judging/{eventID}/{year}/teams/{id}
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true
+  judgingTeamUpdate:
+    handler: judgingHandlers.teamUpdate
+    events:
+      - http:
+          path: judging/{eventID}/{year}/teams/{id}
+          method: put
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true
+  judgingTeamDelete:
+    handler: judgingHandlers.teamDelete
+    events:
+      - http:
+          path: judging/{eventID}/{year}/teams/{id}
+          method: delete
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true
+  judgingJudgesList:
+    handler: judgingHandlers.judgesList
+    events:
+      - http:
+          path: judging/{eventID}/{year}/judges
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingJudgesCreate:
+    handler: judgingHandlers.judgesCreate
+    events:
+      - http:
+          path: judging/{eventID}/{year}/judges
+          method: post
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingJudgesAutoAssign:
+    handler: judgingHandlers.judgesAutoAssign
+    events:
+      - http:
+          path: judging/{eventID}/{year}/judges/auto-assign
+          method: post
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingJudgeGet:
+    handler: judgingHandlers.judgeGet
+    events:
+      - http:
+          path: judging/{eventID}/{year}/judges/{id}
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true
+  judgingJudgeUpdate:
+    handler: judgingHandlers.judgeUpdate
+    events:
+      - http:
+          path: judging/{eventID}/{year}/judges/{id}
+          method: patch
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true
+  judgingJudgeDelete:
+    handler: judgingHandlers.judgeDelete
+    events:
+      - http:
+          path: judging/{eventID}/{year}/judges/{id}
+          method: delete
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true
+  judgingReviewsList:
+    handler: judgingHandlers.reviewsList
+    events:
+      - http:
+          path: judging/{eventID}/{year}/reviews
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+              querystrings:
+                round: false
+                teamId: false
+                judgeId: false
+          cors: true
+  judgingReviewsSubmit:
+    handler: judgingHandlers.reviewsSubmit
+    events:
+      - http:
+          path: judging/{eventID}/{year}/reviews
+          method: post
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingReviewGet:
+    handler: judgingHandlers.reviewGet
+    events:
+      - http:
+          path: judging/{eventID}/{year}/reviews/{id}
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true
+  judgingReviewDelete:
+    handler: judgingHandlers.reviewDelete
+    events:
+      - http:
+          path: judging/{eventID}/{year}/reviews/{id}
+          method: delete
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true
+  judgingLinksList:
+    handler: judgingHandlers.linksList
+    events:
+      - http:
+          path: judging/{eventID}/{year}/links
+          method: get
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingLinksCreate:
+    handler: judgingHandlers.linksCreate
+    events:
+      - http:
+          path: judging/{eventID}/{year}/links
+          method: post
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+          cors: true
+  judgingLinkDelete:
+    handler: judgingHandlers.linkDelete
+    events:
+      - http:
+          path: judging/{eventID}/{year}/links/{id}
+          method: delete
+          request:
+            parameters:
+              paths:
+                eventID: true
+                year: true
+                id: true
+          cors: true

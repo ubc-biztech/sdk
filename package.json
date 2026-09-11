@@ -29,6 +29,7 @@
   },
   "files": [
     "dist",
+    "src/server/generated/*.yml",
     "docs",
     "guides",
     "AGENTS.md",
@@ -41,7 +42,7 @@
     "gen": "tsx src/gen/index.ts",
     "check:semver": "tsx src/check/semver.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/server/generated/*.yml dist/server/generated/",
     "prepare": "npm run build",
     "test": "vitest run",
     "test:contract": "BT_CONTRACT=1 vitest run test/contract.test.ts",

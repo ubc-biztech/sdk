@@ -238,9 +238,9 @@ const implName = (a: FlatAction) => {
 export function emitServer(o: Ontology, service: string, actions: FlatAction[]): string {
   const scope = actions[0]!.resource.scope;
   const scopeType = scope ? `{ ${Object.entries(scope.key).map(([k, f]) => `${key(k)}: ${tsType(f)}`).join("; ")} }` : "Record<string, never>";
-  const scopeFrom = scope ? `(p) => ({ ${Object.keys(scope.key).map((k) => `${key(k)}: p[${JSON.stringify(k)}] as ${tsType(scope.key[k]!)}`).join(", ")} })` : `() => ({})`;
+  const scopeFrom = scope ? `(p: Record<string, unknown>) => ({ ${Object.keys(scope.key).map((k) => `${key(k)}: p[${JSON.stringify(k)}] as ${tsType(scope.key[k]!)}`).join(", ")} })` : `() => ({})`;
 
-  let out = `${HEADER}import { createRouter, type ActionError, type BaseImpl, type Ctx, type RouteMeta, type Roles } from "../runtime.js";\nimport * as S from "../../client/generated/schemas.js";\n\n`;
+  let out = `${HEADER}import { createActionHandler, createRouter, type ActionError, type BaseImpl, type Ctx, type RouteMeta, type Roles } from "../runtime.js";\nimport * as S from "../../client/generated/schemas.js";\n\n`;
   out += `export { ActionError } from "../runtime.js";\nexport type { Ctx, Principal } from "../runtime.js";\n\n`;
   out += `/** Scope key every action in "${service}" receives. */\nexport type Scope = ${scopeType};\n\n`;
 
@@ -271,8 +271,39 @@ export function emitServer(o: Ontology, service: string, actions: FlatAction[]):
   }
   out += `}\n\n`;
 
-  out += jsdoc(`Build the Lambda handler for "${service}". Wire it to \`ANY ${scope ? actions[0]!.spec.route.path.split("/{")[0] : "/" + service}/{proxy+}\`.`, "");
+  out += jsdoc(
+    `One Lambda handler per declared action, keyed by the impl method name. Pair with the\n\`functions:\` block in ${service}.functions.yml, which declares each route explicitly in serverless.yml:\n\n  export const { ${actions.slice(0, 3).map(implName).join(", ")}, … } = createHandlers(impl);`,
+    "",
+  );
+  out += `export function createHandlers(impl: Impl, log?: (line: Record<string, unknown>) => void) {\n`;
+  out += `  const deps = { service: "${service}", roles, scopeFrom: ${scopeFrom}, impl, log };\n  return {\n`;
+  for (const a of actions) out += `    ${implName(a)}: createActionHandler<Scope, Impl>(deps, routes[${actions.indexOf(a)}]!),\n`;
+  out += `  };\n}\n\n`;
+  out += jsdoc(`One handler for every route, for a single \`ANY …/{proxy+}\` function. Prefer createHandlers() where each endpoint is declared explicitly.`, "");
   out += `export function createHandler(impl: Impl, log?: (line: Record<string, unknown>) => void) {\n`;
   out += `  return createRouter<Scope, Impl>({ service: "${service}", routes, roles, scopeFrom: ${scopeFrom}, impl, log });\n}\n`;
+  return out;
+}
+
+/**
+ * The \`functions:\` entries for a Serverless Framework service, in serverless-biztechapp's exact
+ * style: one function per endpoint, explicit path and method, path parameters declared, cors on.
+ * `handlerFile` is the module that exports the handlers (e.g. "judgingHandlers").
+ */
+export function emitServerlessFunctions(service: string, actions: FlatAction[], handlerFile: string): string {
+  let out = `# GENERATED from the ontology in ubc-biztech/sdk (service "${service}"). Paste under \`functions:\`;\n# regenerate rather than edit. Each entry is one Lambda, like every other endpoint in this repo.\n`;
+  for (const a of actions) {
+    const r = a.spec.route;
+    const path = r.path.replace(/^\//, "");
+    const params = [...r.path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!);
+    const query = r.query ?? [];
+    out += `  ${service}${pascal(implName(a))}:\n    handler: ${handlerFile}.${implName(a)}\n    events:\n      - http:\n          path: ${path}\n          method: ${r.method.toLowerCase()}\n`;
+    if (params.length || query.length) {
+      out += `          request:\n            parameters:\n`;
+      if (params.length) out += `              paths:\n${params.map((p) => `                ${p}: true\n`).join("")}`;
+      if (query.length) out += `              querystrings:\n${query.map((q) => `                ${q}: false\n`).join("")}`;
+    }
+    out += `          cors: true\n`;
+  }
   return out;
 }

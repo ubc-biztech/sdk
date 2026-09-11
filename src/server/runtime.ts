@@ -3,7 +3,7 @@
  * service touches API Gateway. Given the generated route table for a service and a
  * hand-written implementation, it produces one Lambda handler that:
  *
- *   1. matches method + path to an action (path params coerced by declared kind),
+ *   1. takes the route's path params (from API Gateway, or by matching the path for a proxy),
  *   2. resolves the bearer token to a principal via `impl.authenticate`,
  *   3. checks the action's `auth` against the principal's role (with `implies`),
  *   4. validates the merged input (scope + key + body/query) against the wire schema,
@@ -65,6 +65,8 @@ export type ApiGatewayEvent = {
   httpMethod?: string;
   path?: string;
   resource?: string;
+  /** Present when the function is wired to an explicit route (the usual case). */
+  pathParameters?: Record<string, string | undefined> | null;
   headers?: Record<string, string | undefined> | null;
   queryStringParameters?: Record<string, string | undefined> | null;
   body?: string | null;
@@ -77,10 +79,9 @@ export type BaseImpl<Scope> = {
   authenticate(token: string, scope: Scope): Promise<Principal | null>;
 };
 
-const CORS = {
+const CORS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Content-Type,Authorization",
-  "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+  "Access-Control-Allow-Credentials": "true",
 };
 const respond = (statusCode: number, body: unknown): ApiGatewayResponse => ({
   statusCode,
@@ -126,26 +127,116 @@ export function satisfies(roles: Roles, have: string, need: string): boolean {
   return walk(have);
 }
 
-export function createRouter<Scope, Impl extends BaseImpl<Scope>>(opts: {
+type Deps<Scope, Impl extends BaseImpl<Scope>> = {
   service: string;
-  routes: readonly RouteMeta[];
   roles: Roles;
   scopeFrom: (params: Record<string, unknown>) => Scope;
   impl: Impl;
   log?: (line: Record<string, unknown>) => void;
-}): (event: ApiGatewayEvent) => Promise<ApiGatewayResponse> {
-  const compiled = opts.routes.map((r) => ({ r, ...compile(r.path) }));
-  const log = opts.log ?? ((l) => console.log(JSON.stringify(l)));
+};
 
+/**
+ * Handle one already-matched route. `params` are the path parameters as strings.
+ * Everything after routing lives here so a proxy router and per-route handlers behave identically.
+ */
+async function handle<Scope, Impl extends BaseImpl<Scope>>(
+  d: Deps<Scope, Impl>,
+  r: RouteMeta,
+  event: ApiGatewayEvent,
+  params: Record<string, string>,
+): Promise<ApiGatewayResponse> {
+  const log = d.log ?? ((l) => console.log(JSON.stringify(l)));
+  const method = (event.httpMethod ?? "GET").toUpperCase();
+  const requestId = event.requestContext?.requestId ?? "";
+
+  // 1. Assemble wire input: path params (coerced), declared query fields (coerced), body.
+  const input: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(params)) input[k] = coerce(r.paramKinds[k], v);
+  for (const q of r.query) {
+    const v = event.queryStringParameters?.[q];
+    if (v !== undefined && v !== null && v !== "") input[q] = coerce(r.paramKinds[q], v);
+  }
+  if (method !== "GET" && event.body) {
+    let body: unknown;
+    try {
+      body = JSON.parse(event.body);
+    } catch {
+      return respond(400, { message: "Body is not valid JSON" });
+    }
+    if (typeof body !== "object" || body === null || Array.isArray(body)) return respond(400, { message: "Body must be a JSON object" });
+    for (const [k, v] of Object.entries(body as Record<string, unknown>)) if (!(k in params)) input[k] = v;
+  }
+  const scope = d.scopeFrom(input);
+
+  // 2. Authenticate + authorize
+  const authHeader = Object.entries(event.headers ?? {}).find(([k]) => k.toLowerCase() === "authorization")?.[1];
+  const token = authHeader?.replace(/^Bearer\s+/i, "").trim() || null;
+  let principal: Principal | null = null;
+  if (token) principal = await d.impl.authenticate(token, scope);
+  if (r.auth !== "public") {
+    if (!token) return respond(401, { message: `${r.key} requires auth "${r.auth}"; send Authorization: Bearer <token>` });
+    if (!principal) return respond(401, { message: "Token not recognized" });
+    if (!satisfies(d.roles, principal.role, r.auth)) return respond(403, { message: `${r.key} requires "${r.auth}"; this token is "${principal.role}"` });
+  }
+
+  // 3. Validate input
+  const parsed = r.input.safeParse(input);
+  if (!parsed.success) return respond(400, { message: `Invalid input for ${r.key}`, issues: parsed.error.issues });
+
+  // 4. Call, validate output, map errors
+  const ctx: Ctx<Scope> = { scope, principal, token, requestId };
+  const started = Date.now();
+  try {
+    const fn = (d.impl as unknown as Record<string, (c: Ctx<Scope>, i: unknown) => Promise<unknown>>)[r.method];
+    if (typeof fn !== "function") return respond(501, { message: `${r.key} is declared but ${d.service} has no implementation for it (impl.${r.method})` });
+    const out = await fn.call(d.impl, ctx, parsed.data);
+    const checked = r.output.safeParse(out);
+    if (!checked.success) {
+      log({ level: "error", service: d.service, action: r.key, requestId, msg: "output does not match declaration", issues: checked.error.issues });
+      return respond(500, { message: `${r.key}: implementation returned a value that does not match the declaration` });
+    }
+    log({ level: "info", service: d.service, action: r.key, requestId, ms: Date.now() - started, principal: principal?.role ?? "anonymous" });
+    return respond(200, checked.data);
+  } catch (e) {
+    if (e instanceof ActionError) {
+      const status = r.errors[e.name];
+      if (status) return respond(status, { message: e.message, error: e.name, details: e.details });
+      log({ level: "error", service: d.service, action: r.key, requestId, msg: `impl threw undeclared error ${e.name}` });
+      return respond(500, { message: `${r.key}: undeclared error ${e.name}: ${e.message}` });
+    }
+    log({ level: "error", service: d.service, action: r.key, requestId, msg: String((e as Error)?.stack ?? e) });
+    return respond(500, { message: "Internal server error" });
+  }
+}
+
+/**
+ * One Lambda handler per route, for services that declare each endpoint explicitly in
+ * serverless.yml (the BizTech convention). Path parameters come from API Gateway's
+ * `event.pathParameters`; the path template is only used as a fallback.
+ */
+export function createActionHandler<Scope, Impl extends BaseImpl<Scope>>(d: Deps<Scope, Impl>, r: RouteMeta): (event: ApiGatewayEvent) => Promise<ApiGatewayResponse> {
+  const c = compile(r.path);
+  return async (event) => {
+    if ((event.httpMethod ?? "").toUpperCase() === "OPTIONS") return { statusCode: 204, headers: CORS, body: "" };
+    let params: Record<string, string> = {};
+    if (event.pathParameters) {
+      for (const [k, v] of Object.entries(event.pathParameters)) if (v !== undefined) params[k] = decodeURIComponent(v);
+    } else {
+      const m = c.re.exec((event.path ?? "/").replace(/\/+$/, "") || "/");
+      if (!m) return respond(404, { message: `No route for ${event.httpMethod} ${event.path}` });
+      c.names.forEach((n, i) => (params[n] = decodeURIComponent(m[i + 1]!)));
+    }
+    return handle(d, r, event, params);
+  };
+}
+
+/** One handler for every route, dispatching on method + path (for a `{proxy+}` function). */
+export function createRouter<Scope, Impl extends BaseImpl<Scope>>(opts: Deps<Scope, Impl> & { routes: readonly RouteMeta[] }): (event: ApiGatewayEvent) => Promise<ApiGatewayResponse> {
+  const compiled = opts.routes.map((r) => ({ r, ...compile(r.path) }));
   return async (event) => {
     const method = (event.httpMethod ?? "GET").toUpperCase();
-    const requestId = event.requestContext?.requestId ?? "";
-    // API Gateway with a custom domain and empty base path gives the path without a stage prefix.
     const path = (event.path ?? "/").replace(/\/+$/, "") || "/";
     if (method === "OPTIONS") return { statusCode: 204, headers: CORS, body: "" };
-
-    // 1. Route
-    let match: { r: RouteMeta; params: Record<string, string> } | null = null;
     let pathMatched = false;
     for (const c of compiled) {
       const m = c.re.exec(path);
@@ -154,71 +245,8 @@ export function createRouter<Scope, Impl extends BaseImpl<Scope>>(opts: {
       if (c.r.http !== method) continue;
       const params: Record<string, string> = {};
       c.names.forEach((n, i) => (params[n] = decodeURIComponent(m[i + 1]!)));
-      match = { r: c.r, params };
-      break;
+      return handle(opts, c.r, event, params);
     }
-    if (!match) return respond(pathMatched ? 405 : 404, { message: pathMatched ? `Method ${method} not allowed on ${path}` : `No route for ${method} ${path}` });
-    const { r, params } = match;
-
-    // 2. Assemble wire input: path params (coerced), declared query fields (coerced), body.
-    const input: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(params)) input[k] = coerce(r.paramKinds[k], v);
-    for (const q of r.query) {
-      const v = event.queryStringParameters?.[q];
-      if (v !== undefined && v !== null && v !== "") input[q] = coerce(r.paramKinds[q], v);
-    }
-    if (method !== "GET" && event.body) {
-      let body: unknown;
-      try {
-        body = JSON.parse(event.body);
-      } catch {
-        return respond(400, { message: "Body is not valid JSON" });
-      }
-      if (typeof body !== "object" || body === null || Array.isArray(body)) return respond(400, { message: "Body must be a JSON object" });
-      for (const [k, v] of Object.entries(body as Record<string, unknown>)) if (!(k in params)) input[k] = v;
-    }
-    const scope = opts.scopeFrom(input);
-
-    // 3. Authenticate + authorize
-    const authHeader = Object.entries(event.headers ?? {}).find(([k]) => k.toLowerCase() === "authorization")?.[1];
-    const token = authHeader?.replace(/^Bearer\s+/i, "").trim() || null;
-    let principal: Principal | null = null;
-    if (token) principal = await opts.impl.authenticate(token, scope);
-    if (r.auth !== "public") {
-      if (!token) return respond(401, { message: `${r.key} requires auth "${r.auth}"; send Authorization: Bearer <token>` });
-      if (!principal) return respond(401, { message: "Token not recognized" });
-      if (!satisfies(opts.roles, principal.role, r.auth)) return respond(403, { message: `${r.key} requires "${r.auth}"; this token is "${principal.role}"` });
-    }
-
-    // 4. Validate input
-    const parsed = r.input.safeParse(input);
-    if (!parsed.success) return respond(400, { message: `Invalid input for ${r.key}`, issues: parsed.error.issues });
-
-    // 5. Call
-    const ctx: Ctx<Scope> = { scope, principal, token, requestId };
-    const started = Date.now();
-    try {
-      const fn = (opts.impl as unknown as Record<string, (c: Ctx<Scope>, i: unknown) => Promise<unknown>>)[r.method];
-      if (typeof fn !== "function") return respond(501, { message: `${r.key} is declared but ${opts.service} has no implementation for it (impl.${r.method})` });
-      const out = await fn.call(opts.impl, ctx, parsed.data); // .call: impls are usually classes
-      // 6. Validate output: the declaration is the contract in both directions.
-      const checked = r.output.safeParse(out);
-      if (!checked.success) {
-        log({ level: "error", service: opts.service, action: r.key, requestId, msg: "output does not match declaration", issues: checked.error.issues });
-        return respond(500, { message: `${r.key}: implementation returned a value that does not match the declaration` });
-      }
-      log({ level: "info", service: opts.service, action: r.key, requestId, ms: Date.now() - started, principal: principal?.role ?? "anonymous" });
-      return respond(200, checked.data);
-    } catch (e) {
-      // 7. Errors
-      if (e instanceof ActionError) {
-        const status = r.errors[e.name];
-        if (status) return respond(status, { message: e.message, error: e.name, details: e.details });
-        log({ level: "error", service: opts.service, action: r.key, requestId, msg: `impl threw undeclared error ${e.name}` });
-        return respond(500, { message: `${r.key}: undeclared error ${e.name}: ${e.message}` });
-      }
-      log({ level: "error", service: opts.service, action: r.key, requestId, msg: String((e as Error)?.stack ?? e) });
-      return respond(500, { message: "Internal server error" });
-    }
+    return respond(pathMatched ? 405 : 404, { message: pathMatched ? `Method ${method} not allowed on ${path}` : `No route for ${method} ${path}` });
   };
 }
