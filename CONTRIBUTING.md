@@ -67,7 +67,7 @@ export const reviews = resource({ singular: "review", plural: "reviews", scope: 
 
 `npm run gen` then also writes `src/server/generated/<service>.ts`: a route table, an `Impl` interface with
 one typed method per action, and `createHandler(impl)`. The backend service imports that and supplies the
-methods; see `serverless-biztechapp/services/judging` for the worked example. Adding an action here makes
+methods; see `serverless-biztechapp/services/teams/judging.ts` for the worked example. Adding an action here makes
 the backend fail to compile until the method exists, which is the point.
 
 ### Something else
