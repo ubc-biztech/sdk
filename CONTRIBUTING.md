@@ -65,9 +65,11 @@ export const judgingScope = { name: "judging", description: "…", key: { eventI
 export const reviews = resource({ singular: "review", plural: "reviews", scope: judgingScope, service: "judging", ... });
 ```
 
-`npm run gen` then also writes `src/server/generated/<service>.ts`: a route table, an `Impl` interface with
-one typed method per action, and `createHandler(impl)`. The backend service imports that and supplies the
-methods; see `serverless-biztechapp/services/teams/judging.ts` for the worked example. Adding an action here makes
+`npm run gen` then also writes `src/server/generated/<service>.ts` (an `Impl` interface with one typed
+method per action, and `createHandlers(impl)` returning one Lambda handler per action) and
+`<service>.functions.yml` (the `functions:` block for `serverless.yml`, one entry per endpoint in
+serverless-biztechapp's style). The backend pastes the block and supplies the methods; see
+`serverless-biztechapp/services/teams/judgingHelpers.ts` and `judgingHandlers.ts`. Adding an action here makes
 the backend fail to compile until the method exists, which is the point.
 
 ### Something else

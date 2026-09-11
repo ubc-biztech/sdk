@@ -3,7 +3,7 @@
  *
  * Unlike everything else in this directory, these resources are served by a **generated**
  * service (`service: "judging"`): the SDK emits the router and the implementation contract,
- * and `serverless-biztechapp/services/teams/judging.ts` supplies the business logic. There is no
+ * and `serverless-biztechapp/services/teams/judgingHelpers.ts` supplies the business logic. There is no
  * hand-written handler to be honest about; this file *is* the API.
  *
  * Model follows the portal's Firestore shape so the migration is mechanical: settings,
