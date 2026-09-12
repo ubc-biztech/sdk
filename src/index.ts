@@ -7,7 +7,7 @@
  * const event = await bt.event("blueprint", 2026).get();
  * ```
  *
- * Everything under ./generated is emitted from src/ontology/. This file and ./runtime.ts
+ * Everything under ./generated is emitted from src/. This file and ./runtime.ts
  * are the only hand-written code in the published package.
  */
 export { createClient, type BtClient } from "./generated/client.js";

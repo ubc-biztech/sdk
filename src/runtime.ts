@@ -40,8 +40,8 @@ export class InputError extends BtError {
 }
 
 /**
- * The backend's response did not match the declared output. This means the ontology
- * is wrong about reality (RFC §9.2). Fix the declaration; do not catch this in app code.
+ * The backend's response did not match the declared output. This means the declaration
+ * is wrong about reality. Fix the declaration; do not catch this in app code.
  */
 export class ContractViolationError extends BtError {
   override readonly name = "ContractViolationError";
@@ -155,7 +155,7 @@ export class Runtime {
       throw new ApiError(meta.key, res.status, message, data);
     }
 
-    // 6. Validate output. A mismatch is the ontology being wrong, not the caller.
+    // 6. Validate output. A mismatch is the declaration being wrong, not the caller.
     if (this.config.validateOutput === false) return data as T;
     const parsed = meta.output.safeParse(data);
     if (!parsed.success) throw new ContractViolationError(meta.key, parsed.error.issues, data);

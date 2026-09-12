@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createClient, EventNotFoundError, ApiError, NotAuthenticatedError, InputError, ContractViolationError } from "../src/client/index.js";
+import { createClient, EventNotFoundError, ApiError, NotAuthenticatedError, InputError, ContractViolationError } from "../src/index.js";
 
 type Call = { url: string; init: RequestInit };
 function fake(status: number, body: unknown) {
@@ -117,16 +117,18 @@ describe("chained client", () => {
 
 describe("scoped resources", () => {
   const ok = (body: unknown) => fake(200, body);
-  it("scope key flows into path params of every nested action", async () => {
-    const { calls, fetch } = ok({ eventName: "HH", phase: "prelim", perTeamJudges: 2, finalsTopN: 5, finalsTeamIds: [], finalsJudgeIds: [], showTeamFeedback: false, allowJudgeSeeOthers: true, anonymizeTeams: false, lockSubmissions: false, maxImages: 10, updatedAt: "t" });
-    await createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).settings.get();
-    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/settings");
+  const info = { settings: { eventName: "HH", phase: "prelim" }, links: [] };
+  it("scope key flows into the path; a keyless resource named after the scope sits on it", async () => {
+    const { calls, fetch } = ok(info);
+    const r = await createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).info();
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027");
+    expect(r.settings.phase).toBe("prelim");
   });
   it("scope key + resource key + input compose, with key fields kept out of the body", async () => {
-    const team = { id: "t1", name: "n", members: [], imageUrls: [], createdAt: "t" };
-    const { calls, fetch } = ok(team);
+    const { calls, fetch } = ok({ id: "t1", name: "n", members: [] });
     await createClient({ baseUrl: "https://x", fetch, getToken: () => "code" }).judging("hellohacks", 2027).team("t1").update({ name: "n", members: [] });
     expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/teams/t1");
+    expect(calls[0]!.init.method).toBe("PUT");
     expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ name: "n", members: [] });
   });
   it("scoped links map scope and key fields onto the target's input", async () => {
@@ -136,7 +138,12 @@ describe("scoped resources", () => {
   });
   it("code roles require a token like any non-public action", async () => {
     const { calls, fetch } = ok([]);
-    await expect(createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).teams.list()).rejects.toBeInstanceOf(NotAuthenticatedError);
+    await expect(createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).get()).rejects.toBeInstanceOf(NotAuthenticatedError);
     expect(calls).toHaveLength(0);
+  });
+  it("a 401 on get is UnknownCodeError", async () => {
+    const { fetch } = fake(401, { message: "Code not recognized" });
+    const err = await createClient({ baseUrl: "https://x", fetch, getToken: () => "bad" }).judging("hellohacks", 2027).get().catch((e) => e);
+    expect(err.name).toBe("UnknownCodeError");
   });
 });

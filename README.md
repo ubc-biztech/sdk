@@ -1,7 +1,7 @@
 # @ubc-biztech/sdk
 
 Typed client for BizTech club data. One call per method, one HTTP request per call, to
-`api.ubcbiztech.com`. Everything below is generated from a declared ontology, so the types, the
+`api.ubcbiztech.com`. Everything below is generated from one declaration, so the types, the
 error classes and the JSDoc on every method agree with each other by construction.
 
 ## Install
@@ -47,7 +47,7 @@ bt.<singleton>.<action>(input)           // no key:      bt.me.get(), bt.judging
 ```
 
 Every method returns a `Promise` of a typed value. Input is validated before sending; output is
-validated after, and fields the ontology does not declare are stripped.
+validated after, and fields the declaration does not include are stripped.
 
 ## Reference
 
@@ -101,44 +101,33 @@ await bt.team(teamID).assignJudges({ judgeIDs: ["j@corp.com"] }); // throws AllJ
 
 In `teams.scores()` the `teamID` field is `"<teamId>;<round>"`. Split on `;` to get the team.
 
-### Judging (generated service)
+### Hackathon judging
 
-Everything under `bt.judging(eventID, year)` is served by the `judging` backend service, whose router and
-contract are generated from the same declaration as this client. People here log in with **codes**, not
-BizTech accounts: call `session.login` once, then pass the code as the token.
+`bt.judging(eventID, year)` is the HelloHacks judging portal's API. Judges and teams have no BizTech
+account: they log in with a **code**, and the code is the bearer token from then on.
 
 ```ts
 const j = bt.judging("hellohacks", 2027);
 
-// Login. The code becomes the bearer token for everything after.
-const who = await j.session.login({ code: "ABCD-1234" });   // { role: "judge", id, name, eventName }
-const bt2 = createClient({ baseUrl, getToken: () => "ABCD-1234" });
-const jj = bt2.judging("hellohacks", 2027);
+const info  = await j.info();        // public: { settings: { eventName, phase }, links }
+const event = await j.get();         // with a code: settings, rubric, links, judges, teams, and `me`
+                                     // throws UnknownCodeError (401) when the code is wrong, so this is login
 
-const settings = await j.settings.get();                     // public: phase, finals config
-const rubric   = await jj.rubric.get();                       // criteria, weights, scale
-const teams    = await jj.teams.list();                       // JudgingTeam[]; `code` only for admins
-const team     = await jj.team(teamId).get();
-const mine     = await jj.judge(judgeId).reviews();           // link: everything this judge submitted
+await j.team(teamId).update({ name, members, description, github, devpost, imageUrls });  // the team itself, during submission
+await j.team(teamId).review({ scores: { design: 4, impact: 5 }, feedback: "…" });         // a judge; totals computed server-side
+const reviews = await j.reviews.list({ round: "prelim" });                                 // filtered by what the caller may see
 
-await jj.reviews.submit({ teamId, scores: { design: 4, impact: 5 }, feedback: "…" });  // totals computed server-side
-const board    = await jj.reviews.list({ round: "prelim" });  // Review[]; teams see only their own, when public
-
-// Organizer only
-await jj.settings.set({ ...settings, phase: "finals", finalsTeamIds: top5, finalsJudgeIds });
-await jj.rubric.set({ name, scaleMax: 5, scoreMode: "weighted", criteria });
-const judge    = await jj.judges.create({ name: "Ada" });     // returns the login code once
-const buckets  = await jj.judges.autoAssign({ perTeamJudges: 2 });
-await jj.team(teamId).delete();
+// Organizer: the event is one document, read with get() and replaced whole with set().
+await j.set({ ...event, settings: { ...event.settings, phase: "finals" } });   // new judges/teams get ids and codes minted
 ```
 
-Roles: `judgingAdmin` implies `judge` implies `judgingCode` (any code, including a team's). The
-JSDoc on each method names the role it needs.
+Roles: `judgingAdmin` implies `judge` implies `judgingCode` (any code, including a team's). Codes are
+returned only to admins. Every method's JSDoc names the role it needs.
 
-### Legacy judging (teams service)
+### Legacy judging (ProductX)
 
 The teams service's original five-metric flow is still exposed as `bt.legacyJudge(email)` and
-`bt.judgingRound` for anything not yet on the generated service. See `docs/legacyJudge.md`.
+`bt.judgingRound`. See `docs/legacyJudge.md`.
 
 ## Errors
 
@@ -150,7 +139,7 @@ Every failure is a thrown class. Branch on `instanceof`, never on a status numbe
 | `ApiError` | Any other non-2xx. Has `.status`, `.action`, `.details`. |
 | `NotAuthenticatedError` | Action needs a token and `getToken` returned null. Thrown before any HTTP. |
 | `InputError` | Your input failed the declared schema. Thrown before any HTTP. `.details` has the issues. |
-| `ContractViolationError` | The backend returned something the ontology does not declare. Do not catch this; report it. |
+| `ContractViolationError` | The backend returned something the declaration does not describe. Do not catch this; report it. |
 
 ```ts
 import { EventNotFoundError, ApiError } from "@ubc-biztech/sdk";
@@ -176,8 +165,8 @@ import { EventSchema } from "@ubc-biztech/sdk";       // z.ZodType<Event>
 ## Migrating an existing app
 
 Replace one call at a time. Keep the old fetch wrapper for everything the SDK does not cover yet, and add a
-lint rule against new uses. If the SDK does not cover an endpoint you need, the fix is a declaration in
-`src/ontology/` of this repo, not a raw fetch. See [`CONTRIBUTING.md`](./CONTRIBUTING.md), and
+lint rule against new uses. If the SDK does not cover an endpoint you need, the fix is a declaration file in
+`src/` of this repo, not a raw fetch. See [`CONTRIBUTING.md`](./CONTRIBUTING.md), and
 [`guides/judging-portal.md`](./guides/judging-portal.md) for a worked migration.
 
 ## Changing the SDK
@@ -188,10 +177,17 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the recipes and [`guides/how-it-w
 if you want to follow one call end to end.
 
 ```
-src/ontology/   the declaration: roles, entities, resources. The only thing you edit.
-src/client/     runtime.ts + index.ts are hand-written; generated/ is not
-src/gen/        the generator (template strings). You should never need to open it.
-docs/           generated reference
-guides/         migration guides and the end-to-end walkthrough
-test/           unit, validation, guardrails, semver rules, and the daily contract test against api-dev
+src/
+  events.ts, users.ts, registrations.ts, teams.ts, judging.ts   the declarations. The only files you edit.
+  roles.ts        who may call what
+  api.ts          lists every declaration file so the generator can find it
+  define.ts       the builders the declarations are written with (entity, resource, action, str, …)
+  generate.ts     npm run gen: writes generated/ and docs/
+  runtime.ts      the one place HTTP happens
+  index.ts        what the package exports
+  generated/      output. Never edit.
+  check.ts, new.ts, semver.ts   the tools behind npm run check / new
+docs/             generated reference
+guides/           migration guides and the end-to-end walkthrough
+test/             unit, validation, guardrails, semver rules, and the daily contract test against api-dev
 ```

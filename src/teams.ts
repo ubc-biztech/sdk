@@ -1,4 +1,4 @@
-import { entity, resource, action, str, int, num, json, list, obj, record, ref } from "../dsl.js";
+import { entity, resource, action, str, int, num, json, list, obj, record, ref } from "./define.js";
 
 // ─── Entities ─────────────────────────────────────────────────────────
 

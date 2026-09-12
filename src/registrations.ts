@@ -1,4 +1,4 @@
-import { entity, resource, action, str, int, bool, json, list, ref } from "../dsl.js";
+import { entity, resource, action, str, int, bool, json, list, ref } from "./define.js";
 
 export const Registration = entity({
   name: "Registration",

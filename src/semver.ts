@@ -1,9 +1,9 @@
 /**
- * Classifies the change between two ontology snapshots as major / minor / none and, with
+ * Classifies the change between two api.json snapshots as major / minor / none and, with
  * `--enforce <base-package.json>`, refuses when package.json's version bump is smaller
  * than the change requires. Usage:
  *
- *   tsx src/check/semver.ts <base-ontology.json> [--enforce <base-package.json>]
+ *   tsx src/semver.ts <base-api.json> [--enforce <base-package.json>]
  *
  * Rules (deliberately mechanical):
  *   major — removed role/entity/field/resource/action/link; resource key changed; field kind
@@ -12,14 +12,14 @@
  *   minor — anything else added; input field went required→optional; descriptions changed
  */
 import { readFileSync } from "node:fs";
-import { flatten, validate, type FieldSpec, type Fields, type Ontology } from "../ontology/dsl.js";
-import { ontology } from "../ontology/index.js";
+import { flatten, validate, type FieldSpec, type Fields, type Api } from "./define.js";
+import { api } from "./api.js";
 
 type Bump = "none" | "minor" | "major";
 type Side = "input" | "output";
 const rank: Record<Bump, number> = { none: 0, minor: 1, major: 2 };
 
-export function classify(base: Ontology, next: Ontology): { bump: Bump; reasons: { bump: Bump; why: string }[] } {
+export function classify(base: Api, next: Api): { bump: Bump; reasons: { bump: Bump; why: string }[] } {
   const reasons: { bump: Bump; why: string }[] = [];
   const note = (bump: Bump, why: string) => reasons.push({ bump, why });
 
@@ -107,17 +107,17 @@ function requiredBump(from: string, to: string): Bump {
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split("/").pop()!)) {
   const [basePath, flag, basePkgPath] = process.argv.slice(2);
   if (!basePath) {
-    console.error("usage: semver.ts <base-ontology.json> [--enforce <base-package.json>]");
+    console.error("usage: semver.ts <base-api.json> [--enforce <base-package.json>]");
     process.exit(2);
   }
-  validate(ontology);
-  const base = JSON.parse(readFileSync(basePath, "utf8")) as Ontology;
-  const { bump, reasons } = classify(base, ontology);
-  console.log(`ontology change: ${bump}`);
+  validate(api);
+  const base = JSON.parse(readFileSync(basePath, "utf8")) as Api;
+  const { bump, reasons } = classify(base, api);
+  console.log(`api change: ${bump}`);
   for (const r of reasons) console.log(`  ${r.bump.padEnd(5)} ${r.why}`);
   if (flag === "--enforce" && basePkgPath) {
     const from = (JSON.parse(readFileSync(basePkgPath, "utf8")) as { version: string }).version;
-    const to = (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string }).version;
+    const to = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
     const got = requiredBump(from, to);
     console.log(`package version: ${from} → ${to} (${got}); required: ${bump}`);
     if (rank[got] < rank[bump]) {

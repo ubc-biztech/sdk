@@ -6,7 +6,7 @@
  * Skipped unless BT_CONTRACT=1, because it needs the network.
  */
 import { describe, expect, it } from "vitest";
-import { createClient, ApiError, EventNotFoundError, NotAuthenticatedError, EventSchema } from "../src/client/index.js";
+import { createClient, ApiError, EventNotFoundError, NotAuthenticatedError, EventSchema } from "../src/index.js";
 import knownDrift from "./known-drift.json" with { type: "json" };
 
 const enabled = process.env.BT_CONTRACT === "1";

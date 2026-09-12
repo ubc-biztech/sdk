@@ -1,8 +1,8 @@
 # `judging.team`
 
-Teams being judged. `bt.judging(e, y).teams.list()`, `bt.judging(e, y).team(id).get()`.
+One team. `bt.judging(e, y).team(id).update(…)` edits its entry, `.review(…)` scores it.
 
-Scoped under `bt.judging(eventID, year)`: One event's judging. Keyed like Event: (eventID, year). Served by the generated `judging` service.
+Scoped under `bt.judging(eventID, year)`: One event's judging. Keyed like Event: (eventID, year).
 
 **Key** (positional arguments of `bt.team(…)`)
 
@@ -10,53 +10,9 @@ Scoped under `bt.judging(eventID, year)`: One event's judging. Keyed like Event:
 |---|---|---|
 | `id` | string | Team id. |
 
-## `bt.judging(eventID, year).teams.list()`
-
-All teams, sorted by name. `code` is included only for `judgingAdmin` callers.
-
-- **Auth:** `judgingCode`
-- **Route:** `GET /judging/{eventID}/{year}/teams`
-
-**Output:** [JudgingTeam](./entities.md#judgingteam)[] — Teams by name.
-
-## `bt.judging(eventID, year).teams.create(input)`
-
-Create a team. A login code is generated and returned.
-
-- **Auth:** `judgingAdmin`
-- **Route:** `POST /judging/{eventID}/{year}/teams`
-
-**Input**
-
-| Field | Type | Description |
-|---|---|---|
-| `name` | string | Team name. |
-| `members` | array | Member display names. |
-| `description` | string? | Project pitch. |
-| `github` | string? | Repository URL. |
-| `devpost` | string? | Devpost URL. |
-| `imageUrls` | array? | Screenshots. |
-
-**Output:** [JudgingTeam](./entities.md#judgingteam) — The new team, including its code.
-
-## `bt.judging(eventID, year).team(id).get()`
-
-One team. `code` only for `judgingAdmin`.
-
-- **Auth:** `judgingCode`
-- **Route:** `GET /judging/{eventID}/{year}/teams/{id}`
-
-**Output:** [JudgingTeam](./entities.md#judgingteam) — The team.
-
-**Errors**
-
-| Error | HTTP | When |
-|---|---|---|
-| `TeamNotFoundError` | 404 | No such team. |
-
 ## `bt.judging(eventID, year).team(id).update(input)`
 
-Replace the editable fields. A team's own code may update its own team while the phase is `submission` and submissions are not locked; admins may update any team at any time.
+Replace the team's editable fields. The team's own code may do this while the phase is `submission` and submissions are not locked; admins may at any time.
 
 - **Auth:** `judgingCode`
 - **Route:** `PUT /judging/{eventID}/{year}/teams/{id}`
@@ -70,9 +26,9 @@ Replace the editable fields. A team's own code may update its own team while the
 | `description` | string? | Project pitch. |
 | `github` | string? | Repository URL. |
 | `devpost` | string? | Devpost URL. |
-| `imageUrls` | array? | Screenshots. |
+| `imageUrls` | array? | Screenshots, as URLs. |
 
-**Output:** [JudgingTeam](./entities.md#judgingteam) — The updated team.
+**Output:** [JudgingTeam](./entities.md#judgingteam) — The updated team, without its code.
 
 **Errors**
 
@@ -80,26 +36,35 @@ Replace the editable fields. A team's own code may update its own team while the
 |---|---|---|
 | `TeamNotFoundError` | 404 | No such team. |
 | `ForbiddenError` | 403 | A team code tried to edit a different team. |
-| `SubmissionsLockedError` | 409 | Phase is past `submission` or `lockSubmissions` is on. |
+| `SubmissionsClosedError` | 409 | Phase is past `submission`, or `lockSubmissions` is on, or too many images. |
 
-## `bt.judging(eventID, year).team(id).delete()`
+## `bt.judging(eventID, year).team(id).review(input)`
 
-Delete a team and its reviews.
+Create or replace the caller's review of this team for the current phase's round. Every rubric criterion must be present and in range; totals are computed by the backend. Only while the phase is `prelim` or `finals`; in finals only finals judges may score finalist teams.
 
-- **Auth:** `judgingAdmin`
-- **Route:** `DELETE /judging/{eventID}/{year}/teams/{id}`
+- **Auth:** `judge`
+- **Route:** `PUT /judging/{eventID}/{year}/reviews/{id}`
 
-**Output:** object — Deleted.
+**Input**
+
+| Field | Type | Description |
+|---|---|---|
+| `scores` | record | Keyed by criterion id. Every criterion, nothing else. |
+| `feedback` | string? | Written feedback. |
+
+**Output:** [Review](./entities.md#review) — The stored review with computed totals.
 
 **Errors**
 
 | Error | HTTP | When |
 |---|---|---|
 | `TeamNotFoundError` | 404 | No such team. |
+| `InvalidScoresError` | 406 | A criterion is missing, extra, or out of range. |
+| `PhaseClosedError` | 409 | Judging is not open, or this judge or team is not in the finals. |
 
 ## Links
 
 | Call | Via | Description |
 |---|---|---|
-| `bt.judging(eventID, year).team(id).reviews()` | `judging.reviews.list` | Reviews of this team across rounds. Team codes see them only when results are public. |
+| `bt.judging(eventID, year).team(id).reviews()` | `judging.reviews.list` | Reviews of this team across rounds. |
 

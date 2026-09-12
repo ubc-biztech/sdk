@@ -1,4 +1,4 @@
-import { entity, resource, action, link, str, int, num, bool, json, list, obj, ref } from "../dsl.js";
+import { entity, resource, action, link, str, int, num, bool, json, list, obj, ref } from "./define.js";
 
 /**
  * Field list is what `GET /events/{id}/{year}` returns on api-dev (verified 2026-09-10)

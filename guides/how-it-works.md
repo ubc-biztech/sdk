@@ -9,7 +9,7 @@ you want to: it follows a single call all the way through, and then says what yo
 const event = await bt.event("blueprint", 2026).get();
 ```
 
-## 1. The declaration — `src/ontology/entities/event.ts`
+## 1. The declaration — `src/events.ts`
 
 ```ts
 export const events = resource({
@@ -27,18 +27,18 @@ export const events = resource({
 ```
 
 This is the only file a person edits. It is data, not code: builders like `str()` and `action()` just
-return objects. `src/ontology/index.ts` lists every resource and entity so the generator can find them.
+return objects. `src/api.ts` lists every resource and entity so the generator can find them.
 
-## 2. Validation — `src/ontology/dsl.ts`, `validate()`
+## 2. Validation — `src/define.ts`, `validate()`
 
 Before anything is generated, `validate()` checks the things TypeScript cannot: that `"public"` is a
 declared role, that `{id}` and `{year}` in the path exist as fields, that no description is empty or
 `TODO`. Every message names the file and the fix. If validation passes, the declaration is coherent even
 if the person who wrote it does not know why.
 
-## 3. Generation — `src/gen/`
+## 3. Generation — `src/generate.ts`
 
-`npm run gen` walks the ontology with plain loops and writes three files using template strings:
+`npm run gen` walks the declaration with plain loops and writes three files using template strings:
 
 - `schemas.ts` — `interface Event { ... }` with JSDoc, `EventSchema` (Zod), and for this action
   `EventGetWireSchema` (key + input) and `EventGetOutputSchema`.
@@ -52,10 +52,10 @@ event: (id: string, year: number) => ({
 }),
 ```
 
-There is no AST manipulation and no DSL; `src/gen/emit.ts` is `out += \`...\`` all the way down. It also
-writes `docs/*.md` and `ontology.json` (a snapshot used to classify version bumps).
+There is no AST manipulation ; `src/generate.ts` is `out += \`...\`` all the way down. It also
+writes `docs/*.md` and `api.json` (a snapshot used to classify version bumps).
 
-## 4. The runtime — `src/client/runtime.ts`, `Runtime.call()`
+## 4. The runtime — `src/runtime.ts`, `Runtime.call()`
 
 The one hand-written place HTTP happens. In order:
 
@@ -78,11 +78,11 @@ to be malformed, so the test fails only on *new* drift.
 
 ## What you can ignore
 
-- **`src/gen/`** unless you are adding a new kind of output. Adding endpoints never touches it.
-- **`src/client/runtime.ts`** unless HTTP itself is wrong. Adding endpoints never touches it.
-- **`src/check/semver.ts`** entirely. `npm run check` runs it and tells you what version to set.
-- **`src/client/generated/`** entirely. Never edit it; it is overwritten.
+- **`src/generate.ts`** unless you are adding a new kind of output. Adding endpoints never touches it.
+- **`src/runtime.ts`** unless HTTP itself is wrong. Adding endpoints never touches it.
+- **`src/semver.ts`** entirely. `npm run check` runs it and tells you what version to set.
+- **`src/generated/`** entirely. Never edit it; it is overwritten.
 
 ## What to understand first, if you want to understand one thing
 
-`src/ontology/entities/event.ts`, top to bottom. Every other resource file is the same shape.
+`src/events.ts`, top to bottom. Every other declaration file is the same shape.

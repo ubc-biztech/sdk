@@ -8,7 +8,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const contract = process.argv.includes("--contract");
 type Step = { name: string; run: () => string | null; fix: string; /** true: a non-null result is a note, not a failure */ soft?: boolean };
 const results: { name: string; ok: boolean; detail: string; fix: string }[] = [];
@@ -22,15 +22,15 @@ const tail = (s: string, n = 25) => s.split("\n").slice(-n).join("\n");
 
 const steps: Step[] = [
   {
-    name: "ontology is valid",
+    name: "declaration is valid",
     run: () => {
-      const r = sh("npx tsx -e \"import('./src/ontology/dsl.js').then(async (d) => { const { ontology } = await import('./src/ontology/index.js'); d.validate(ontology); })\"");
+      const r = sh("npx tsx -e \"import('./src/define.js').then(async (d) => { const { api } = await import('./src/api.js'); d.validate(api); })\"");
       if (r.ok) return null;
       // Keep only the message; resolve the `*.ts (resource "x")` hints to the real file.
       let msg = r.out.replace(/^[\s\S]*?Error: /, "").replace(/\n\s+at [\s\S]*$/, "").replace(/\n\nNode\.js v[\s\S]*$/, "");
-      msg = msg.replace(/src\/ontology\/entities\/\*\.ts \(resource "(\w+)"\)/g, (_, r: string) => {
-        const hit = sh(`grep -l 'singular: "${r}"' src/ontology/entities/*.ts`).out.split("\n")[0];
-        return hit || `src/ontology/entities/*.ts (resource "${r}")`;
+      msg = msg.replace(/src\/\*\.ts \(resource "(\w+)"\)/g, (_, r: string) => {
+        const hit = sh(`grep -l 'singular: "${r}"' src/*.ts`).out.split("\n")[0];
+        return hit || `src/*.ts (resource "${r}")`;
       });
       return msg;
     },
@@ -41,10 +41,10 @@ const steps: Step[] = [
     run: () => {
       const r = sh("npm run -s gen");
       if (!r.ok) return tail(r.out);
-      const d = sh("git diff --stat -- src/client/generated src/server/generated docs");
+      const d = sh("git diff --stat -- src/generated docs");
       return d.out ? `Regenerated; these differ from the last commit:\n${d.out}` : null;
     },
-    fix: "The generator has already rewritten them. Commit src/client/generated, src/server/generated and docs together with your ontology change.",
+    fix: "The generator has already rewritten them. Commit src/generated and docs together with your change.",
     soft: true,
   },
   {
@@ -61,19 +61,19 @@ const steps: Step[] = [
       const r = sh("npx vitest run --reporter=dot");
       return r.ok ? null : tail(r.out, 40);
     },
-    fix: "If the failing test is in test/ontology.test.ts or test/semver.test.ts and you changed the DSL or generator, the test may need updating. If it is test/runtime.test.ts, the runtime broke; that file is hand-written and small.",
+    fix: "If the failing test is in test/api.test.ts or test/semver.test.ts and you changed define.ts or generate.ts, the test may need updating. If it is test/runtime.test.ts, the runtime broke; that file is hand-written and small.",
   },
   {
     name: "package version matches the size of the change",
     run: () => {
-      const base = sh("git show origin/main:src/client/generated/ontology.json");
+      const base = sh("git show origin/main:src/generated/api.json");
       const basePkg = sh("git show origin/main:package.json");
       if (!base.ok || !basePkg.ok) return null; // no origin yet
       const tmp = join(root, "node_modules", ".cache");
       execSync(`mkdir -p ${tmp}`);
-      execSync(`git show origin/main:src/client/generated/ontology.json > ${tmp}/base-ontology.json`, { cwd: root });
+      execSync(`git show origin/main:src/generated/api.json > ${tmp}/base-api.json`, { cwd: root });
       execSync(`git show origin/main:package.json > ${tmp}/base-package.json`, { cwd: root });
-      const r = sh(`npx tsx src/check/semver.ts ${tmp}/base-ontology.json --enforce ${tmp}/base-package.json`);
+      const r = sh(`npx tsx src/semver.ts ${tmp}/base-api.json --enforce ${tmp}/base-package.json`);
       return r.ok ? null : r.out;
     },
     fix: "Change `version` in package.json as the last line above says (major = first number +1, minor = second number +1, reset the rest to 0).",
@@ -113,7 +113,7 @@ console.log();
 for (const n of notes) console.log(`• ${n}\n`);
 if (!failed.length) {
   console.log(`All green.${contract ? "" : " (Run `npm run check -- --contract` to also verify against api-dev; it needs the network and is read-only.)"}`);
-  console.log("If you changed src/ontology/, commit src/client/generated and docs along with it.");
+  console.log("If you changed a declaration, commit src/generated and docs along with it.");
   process.exit(0);
 }
 for (const f of failed) {

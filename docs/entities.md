@@ -146,101 +146,119 @@ A team's aggregate for the current round, with judge scores z-normalized so a ha
 | `judges` | array | Judges who scored this team. |
 | `originalResponses` | array | Raw per-judge scores before normalization. |
 
+## JudgingEvent
+
+Everything about one event's judging except the reviews. One backend row, read and replaced whole.
+
+| Field | Type | Description |
+|---|---|---|
+| `me` | ref? | The caller. Present on `get`, absent on `set`. |
+| `updatedAt` | string | ISO-8601, set by the backend on every write. |
+| `settings` | ref | Phase and switches. |
+| `rubric` | ref \| null | The rubric, or null before one is set. |
+| `links` | array | Home-page links, in order. |
+| `judges` | array | Every judge. Codes only for admins. |
+| `teams` | array | Every team. Codes only for admins. |
+
+## JudgingInfo
+
+What anyone may see before logging in.
+
+| Field | Type | Description |
+|---|---|---|
+| `settings` | object | Name and phase only. |
+| `links` | array | Home-page links, in order. |
+
 ## JudgingSettings
 
-Per-event judging configuration and phase. One record per event.
+Event phase and switches. Part of JudgingEvent.
 
 | Field | Type | Description |
 |---|---|---|
 | `eventName` | string | Display name, e.g. `HelloHacks 2027`. |
-| `phase` | enum | `submission`: teams edit their entries, no judging. `prelim`: all judges score their assigned teams. `finals`: finals judges score finalist teams. `closed`: nothing changes; results may be shown. |
-| `perTeamJudges` | integer | How many judges auto-assign gives each team. |
-| `finalsTopN` | integer | How many prelim teams advance to finals by default. |
+| `phase` | enum | `submission`: teams edit their entries. `prelim`: judges score. `finals`: finals judges score finalist teams. `closed`: nothing changes. |
 | `finalsTeamIds` | array | Teams in the finals round. Empty until finals are set up. |
 | `finalsJudgeIds` | array | Judges who score finals. Empty until finals are set up. |
-| `showTeamFeedback` | boolean | Teams may see their own reviews and the leaderboard. |
+| `showTeamFeedback` | boolean | Teams may see their own reviews. |
 | `allowJudgeSeeOthers` | boolean | Judges may read other judges' reviews. When false, `reviews.list` returns a judge only their own. |
-| `anonymizeTeams` | boolean | Hide team names from judges (UI concern; the API still returns names to judges). |
+| `anonymizeTeams` | boolean | Hide team names from judges. A UI concern; the API still returns names. |
 | `lockSubmissions` | boolean | Teams may no longer edit their entries, regardless of phase. |
 | `maxImages` | integer | Maximum screenshots per team. |
-| `updatedAt` | string | ISO-8601. |
+| `perTeamJudges` | integer? | How many judges the portal's auto-assign gives each team. Stored, not enforced. |
+| `finalsTopN` | integer? | How many prelim teams the portal advances to finals by default. Stored, not enforced. |
 
 ## Rubric
 
-The scoring rubric for an event. Reviews are scored per criterion against this; totals are computed from it.
+What judges score against. Reviews carry one score per criterion; totals are computed from this.
 
 | Field | Type | Description |
 |---|---|---|
 | `name` | string | Rubric name. |
-| `scaleMax` | integer | Highest score on each criterion, e.g. 5 or 10. |
-| `scoreMode` | enum | `points`: total is the sum of raw scores. `weighted`: each criterion is multiplied by its weight. |
+| `scaleMax` | integer | Highest score on a criterion unless it sets `maxScore`. |
+| `scoreMode` | enum | `points`: total is the sum of raw scores. `weighted`: each score is multiplied by its criterion's weight. |
 | `criteria` | array | Criteria in display order. |
-| `updatedAt` | string | ISO-8601. |
 
 ## JudgingTeam
 
-A team being judged. Independent of the `Team` entity used by the main app; hackathon teams are created by organizers or self-registered with a code.
+A team being judged. Not the main app's Team; hackathon teams live inside JudgingEvent.
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | string | ULID, assigned on create. |
+| `id` | string | Assigned by the backend. |
 | `name` | string | Team name. |
 | `members` | array | Member display names. |
-| `description` | string? | Project pitch. Markdown-ish. |
+| `description` | string? | Project pitch. |
 | `github` | string? | Repository URL. |
 | `devpost` | string? | Devpost URL. |
-| `imageUrls` | array | Screenshots. URLs only; upload is the client's concern for now. |
-| `code` | string? | Login code for the team's own feedback page. Only returned to `judgingAdmin`. |
-| `createdAt` | string | ISO-8601. |
+| `imageUrls` | array? | Screenshots, as URLs. |
+| `code` | string? | Login code for the team's own pages. Only returned to admins; minted by the backend when absent. |
 
 ## Judge
 
-A judge for one event. Has no BizTech account; logs in with `code`.
+A judge for one event. No BizTech account; logs in with `code`.
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | string | ULID, assigned on create. |
+| `id` | string | Assigned by the backend. |
 | `name` | string | Display name, shown on reviews. |
-| `code` | string? | Login code. Only returned to `judgingAdmin`. |
-| `isAdmin` | boolean | This judge's code also grants `judgingAdmin`. |
-| `assignedTeamIds` | array | Teams this judge scores in prelims, in order. |
+| `isAdmin` | boolean? | This judge's code also grants the organizer role. |
+| `assignedTeamIds` | array? | Teams this judge scores in prelims, in order. |
+| `code` | string? | Login code. Only returned to admins; minted by the backend when absent. |
+
+## JudgingLink
+
+A link on the portal home page (schedule, Discord, rules).
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Chosen by the portal. |
+| `label` | string | Link text. |
+| `url` | string | Destination. |
+
+## JudgingPrincipal
+
+Who a code belongs to. Returned as `me` by `judging.get`.
+
+| Field | Type | Description |
+|---|---|---|
+| `role` | enum | What the code grants. Admin is an organizer or a judge with `isAdmin`. |
+| `id` | string | Judge id or team id. For the stage-wide organizer code, the string `admin`. |
+| `name` | string | Display name. |
 
 ## Review
 
-One judge's scores for one team in one round. Id is deterministic (`<round>__<teamId>__<judgeId>`) so a resubmit replaces rather than duplicates.
+One judge's scores for one team in one round. Resubmitting replaces it.
 
 | Field | Type | Description |
 |---|---|---|
 | `id` | string | `<round>__<teamId>__<judgeId>`. |
-| `round` | enum | Round the review belongs to. |
+| `round` | enum | Round the review belongs to; the phase at submission. |
 | `teamId` | string | JudgingTeam id. |
 | `judgeId` | string | Judge id. |
 | `judgeName` | string | Judge display name at submission. |
 | `scores` | record | Keyed by Rubric.criteria[].id. |
 | `feedback` | string | Written feedback. Empty string when none. |
-| `total` | number | Sum of raw scores, computed server-side from the rubric at submission. |
-| `weightedTotal` | number | Sum of score × weight, computed server-side. |
+| `total` | number | Sum of raw scores, computed by the backend. |
+| `weightedTotal` | number | Sum of score × weight, computed by the backend. |
 | `completedAt` | string | ISO-8601. |
-
-## JudgingLink
-
-A link shown on the portal home page (schedule, Discord, rules).
-
-| Field | Type | Description |
-|---|---|---|
-| `id` | string | ULID. |
-| `label` | string | Link text. |
-| `url` | string | Destination. |
-| `order` | integer | Sort key, ascending. |
-
-## JudgingSession
-
-Who a code belongs to. Returned by `session.login`; the code itself is then used as the bearer token.
-
-| Field | Type | Description |
-|---|---|---|
-| `role` | enum | What the code grants. |
-| `id` | string | Judge id or team id. For `judgingAdmin` codes that are not also a judge, the string `admin`. |
-| `name` | string | Display name. |
-| `eventName` | string | From JudgingSettings, so the client can render a header without a second call. |
 

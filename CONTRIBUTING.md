@@ -6,13 +6,13 @@ This repo will outlive everyone who understands it. BizTech turns over its exec 
 realistic maintainer is someone with a partial and partly wrong idea of how it works, probably working
 with a coding agent. The repo is designed for that person:
 
-- **One file per change.** Adding or fixing an endpoint touches one file in `src/ontology/entities/`.
+- **One file per change.** Adding or fixing an endpoint touches one declaration file in `src/`.
   Nothing else needs to be understood, opened, or edited.
 - **Wrong guesses are cheap.** Every mistake is caught by a machine that says which file and what to
   change. Nothing here can touch production; the contract test is read-only against `api-dev`.
 - **One command says whether you are done.** `npm run check`. Green means commit.
 
-If you find yourself needing to understand `src/gen/` or `src/client/runtime.ts` to add an endpoint,
+If you find yourself needing to understand `src/generate.ts` or `src/runtime.ts` to add an endpoint,
 that is a bug in this repo. Say so in an issue.
 
 ## Recipes
@@ -23,7 +23,7 @@ that is a bug in this repo. Say so in an issue.
 npm run new -- sticker stickers        # singular, then plural (omit plural for a singleton like judgingRound)
 ```
 
-This creates `src/ontology/entities/sticker.ts` full of `TODO`s and registers it. Then:
+This creates `src/sticker.ts` full of `TODO`s and registers it in `src/api.ts`. Then:
 
 1. Call the endpoint on `https://api-dev.ubcbiztech.com` (curl, browser, anything) and look at the
    real response. Find its path and method in `serverless-biztechapp/services/<service>/serverless.yml`.
@@ -31,7 +31,7 @@ This creates `src/ontology/entities/sticker.ts` full of `TODO`s and registers it
    500 for not-found, say so in the description instead of declaring a 404.
 3. `npm run check`. It lists what is still wrong and where. Repeat until green.
 4. `npm run check -- --contract` to prove it against `api-dev` (public endpoints only, without a token).
-5. Commit `src/ontology/`, `src/client/generated/`, `docs/`, and `package.json` together.
+5. Commit the declaration, `src/generated/`, `docs/`, and `package.json` together.
 
 ### Add an action to an existing resource
 
@@ -53,24 +53,14 @@ instead; the test then fails only on new drift, and fails again if the entry goe
 ### `npm run check` says to bump the version
 
 Do what it says: `major` = first number up, `minor` = second number up, reset the rest to `0`. The
-rule is mechanical and lives in `src/check/semver.ts`; you never need to read it.
+rule is mechanical and lives in `src/semver.ts`; you never need to read it.
 
-### Declare a resource for a generated service
+### Group resources under one key
 
-Some resources are served by a backend the SDK generates rather than one it merely calls. Declare
-them with `service: "<name>"` and, usually, a `scope` so they nest under one key:
-
-```ts
-export const judgingScope = { name: "judging", description: "…", key: { eventID: str({...}), year: int({...}) } };
-export const reviews = resource({ singular: "review", plural: "reviews", scope: judgingScope, service: "judging", ... });
-```
-
-`npm run gen` then also writes `src/server/generated/<service>.ts` (an `Impl` interface with one typed
-method per action, and `createHandlers(impl)` returning one Lambda handler per action) and
-`<service>.functions.yml` (the `functions:` block for `serverless.yml`, one entry per endpoint in
-serverless-biztechapp's style). The backend pastes the block and supplies the methods; see
-`serverless-biztechapp/services/teams/judgingHelpers.ts` and `judgingHandlers.ts`. Adding an action here makes
-the backend fail to compile until the method exists, which is the point.
+Resources that all belong to one thing (an event's judging) share a `scope` and nest under it:
+`bt.judging(eventID, year).team(id).update(…)`. Declare the scope once, export it, and pass it to each
+resource. A keyless resource named after the scope sits on the scope itself: `bt.judging(e, y).get()`.
+See `src/judging.ts`.
 
 ### Something else
 
@@ -91,7 +81,7 @@ action({ description, auth, input?, output, errors?, route: { method, path, quer
 ```
 
 Field builders: `str int num bool json oneOf(values) list(items) obj(fields) record(values) ref(Entity)`,
-each taking `{ description, optional?, nullable? }`. `auth` is one of the keys in `src/ontology/roles.ts`.
+each taking `{ description, optional?, nullable? }`. `auth` is one of the keys in `src/roles.ts`.
 Fields named `{like_this}` in `route.path` come from the key or input; `route.query` names query params;
 the rest is the JSON body.
 
@@ -99,5 +89,5 @@ the rest is the JSON body.
 
 - `route.path` is the literal path from `serverless.yml`. Never invent one. Never add a trailing slash.
 - Do not add a role to `roles.ts` because an action needs it. Roles are decided in the RFC.
-- The generator (`src/gen/`) is template strings and must stay readable in one sitting. A test fails if
+- The generator (`src/generate.ts`) is template strings and must stay readable in one sitting. A test fails if
   it passes 500 lines. If a change needs a new abstraction there, stop and ask.
