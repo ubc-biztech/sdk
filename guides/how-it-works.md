@@ -52,7 +52,7 @@ event: (id: string, year: number) => ({
 }),
 ```
 
-There is no AST manipulation ; `src/generate.ts` is `out += \`...\`` all the way down. It also
+There is no AST manipulation; `src/generate.ts` is `out += \`...\`` all the way down. It also
 writes `docs/*.md` and `api.json` (a snapshot used to classify version bumps).
 
 ## 4. The runtime — `src/runtime.ts`, `Runtime.call()`

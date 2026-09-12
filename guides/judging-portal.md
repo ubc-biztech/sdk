@@ -1,45 +1,37 @@
 # Moving the HelloHacks judging portal onto @ubc-biztech/sdk
 
-**Status: done in `ubc-biztech/bt-judging`.** This guide records what was decided and why, for the
-next app that moves off a personal database.
+The portal (`ubc-biztech/bt-judging`) kept teams, judges, reviews and the rubric in Firestore and compared
+login codes in the browser. It now calls the BizTech API through this SDK. This guide records what the
+backend looks like and why, for the next app that moves off a personal database.
 
-The portal kept teams, judges, reviews and the rubric in Firestore and signed people in with codes
-compared in the browser. The backend had a different judging model (five fixed metrics, one global round).
-Bending the portal onto that would have made it worse. So the portal's own model became the declaration
-(`src/ontology/entities/judging.ts`) and the backend service was **generated** from it: this was the first
-generated service, and the pilot for collapsing to one description.
+## The backend
+
+Five endpoints in `serverless-biztechapp/services/teams/handlerJudging.ts`, under
+`/judging/{eventID}/{year}`. No new tables:
+
+- One row in `bizJudge` per event holds settings, rubric, links, judges and teams. The organizer reads it
+  with `get()` and replaces it whole with `set()`.
+- One row in `bizFeedback` per review. A judge submits with `team(id).review(…)`; everyone reads with
+  `reviews.list()`, filtered by what their code may see.
+- Teams edit their own entry with `team(id).update(…)` while the phase is `submission`.
+
+Codes never leave the server: `get()` with a code returns `me`, and a wrong code is a 401.
 
 ## What the portal's model became
 
-| Portal (Firestore) | Declaration | Notes |
-|---|---|---|
-| `events/{EVENT_ID}` document | `bt.judging(eventID, year)` scope + `settings` singleton | `hellohacks-2027` → `("hellohacks", 2027)` |
-| `settings.name / requiredJudgeCount / showTeamFeedback …` | `JudgingSettings` | Field names kept where they existed; `name` → `eventName`, `requiredJudgeCount` → `perTeamJudges` |
-| `phase: "submission" \| "judging" \| "closed"` and `"prelim" \| "finals"` | `submission \| prelim \| finals \| closed` | The portal used two vocabularies; the declaration has one |
-| `rubric/default` | `rubric` singleton | Criteria with weights; totals computed server-side |
-| `teams` | `teams` / `team(id)` | Server-assigned ids and login codes; images are URLs |
-| `judges` (with codes, `assignedTeamIds`) | `judges` / `judge(id)` | `isAdmin` grants the organizer role |
-| `reviews` keyed `<teamId>__<judgeId>` | `reviews`, id `<round>__<teamId>__<judgeId>` | Resubmit replaces |
-| `links` | `links` | |
-| code scan in the browser | `session.login({ code })` | Codes never leave the server |
-
-## Auth
-
-Roles `judgingCode`, `judge`, `judgingAdmin` are code roles: the bearer token is a code minted by the
-service, resolved by `impl.authenticate`. `judgingAdmin` implies `judge` implies `judgingCode`. Row-level
-rules (a team sees only its own reviews; judges see others' only when allowed) live in the implementation,
-not the router. A per-stage bootstrap code creates the first organizer.
-
-## Real-time
-
-Firestore listeners became `usePoll` (5 s, paused when hidden). Fine for a judging event; if it is not,
-the answer is a subscription capability on the generated service, not a second database.
+| Portal (Firestore) | SDK |
+|---|---|
+| `events/{EVENT_ID}` document | `bt.judging(eventID, year)`; `hellohacks-2027` → `("hellohacks", 2027)` |
+| `settings`, `rubric/default`, `links` | fields of the one document, read by `get()` and written by `set()` |
+| `teams`, `judges` with codes | lists inside the document; ids and codes minted by the backend on `set()` |
+| `reviews` keyed `<teamId>__<judgeId>` | `Review`, id `<round>__<teamId>__<judgeId>`; resubmit replaces |
+| auto-assign, finals selection | done in the browser, saved with `set()` |
+| code scan in the browser | `judgingAs(code).get()` |
 
 ## The lessons
 
-- Declare reality, then move the app: the declaration was corrected twice while wiring the portal
-  (settings fields, phase names). Both were caught by the compiler, not by a judge at the event.
-- One description: with the router generated, adding an action makes the backend fail to compile until it
-  is implemented, and makes the client's types change in the same commit.
+- Declare what the backend really returns, then move the app. The compiler catches the mismatch, not a
+  judge at the event.
+- The whole-document write is last-write-wins. Fine for one organizer; not for two editing at once.
 - Anything the old app did that the API cannot express (Firebase Storage uploads) got a smaller
   replacement (URLs), recorded in the app's README, rather than a side channel.

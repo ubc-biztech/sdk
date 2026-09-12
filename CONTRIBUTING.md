@@ -88,6 +88,6 @@ the rest is the JSON body.
 ## Rules that the machine does not enforce
 
 - `route.path` is the literal path from `serverless.yml`. Never invent one. Never add a trailing slash.
-- Do not add a role to `roles.ts` because an action needs it. Roles are decided in the RFC.
+- Do not add a role to `roles.ts` because an action needs it. Roles are decided in roles.ts, on purpose, not per endpoint.
 - The generator (`src/generate.ts`) is template strings and must stay readable in one sitting. A test fails if
   it passes 500 lines. If a change needs a new abstraction there, stop and ask.
