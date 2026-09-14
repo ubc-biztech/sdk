@@ -1,16 +1,8 @@
-/**
- * Classifies the change between two api.json snapshots as major / minor / none and, with
- * `--enforce <base-package.json>`, refuses when package.json's version bump is smaller
- * than the change requires. Usage:
- *
- *   tsx scripts/semver.ts <base-api.json> [--enforce <base-package.json>]
- *
- * Rules (deliberately mechanical):
- *   major — removed role/entity/field/resource/action/link; resource key changed; field kind
- *           changed; output field went required→optional; input field went optional→required
- *           or was added as required; auth, method or path changed; error removed
- *   minor — anything else added; input field went required→optional; descriptions changed
- */
+// The rules, deliberately mechanical:
+//   major — removed role/entity/field/resource/action/link; resource key changed; field kind
+//           changed; output field went required→optional; input field went optional→required
+//           or was added as required; auth, method or path changed; error removed
+//   minor — anything else added; input field went required→optional; descriptions changed
 import { readFileSync } from "node:fs";
 import { flatten, validate, type FieldSpec, type Fields, type Api } from "../src/core/define.js";
 import { api } from "../src/resources/index.js";

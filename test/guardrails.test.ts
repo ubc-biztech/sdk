@@ -1,15 +1,9 @@
-/**
- * Guardrails for people who do not understand this repo (which is everyone, soon).
- * Each test encodes one mistake that is easy to make with a wrong mental model, and
- * fails with a message that says what to do.
- */
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { api } from "../src/resources/index.js";
 import { flatten } from "../src/core/define.js";
 
 describe("guardrails", () => {
-  /** The declaration files: everything in src/resources/ except the registry and the roles. */
   const declarationFiles = () => readdirSync("src/resources").filter((f) => f.endsWith(".ts") && !["index.ts", "roles.ts"].includes(f));
 
   it("every declaration file in src/resources/ is registered in src/resources/index.ts", () => {

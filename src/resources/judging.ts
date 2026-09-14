@@ -1,15 +1,6 @@
-/**
- * Hackathon judging, used by bt-judging. Served by serverless-biztechapp/services/teams/handlerJudging.ts.
- *
- * One event's judging is one backend row: settings, rubric, links, judges and teams. Reviews
- * are separate rows. Two kinds of caller:
- *
- * - Judges and teams have no BizTech account. An organizer mints them a code, and the code
- *   goes in the `X-Judging-Code` header. `bt.judging(e, y).get()` with a code returns the
- *   event and who the code belongs to, so it doubles as login.
- * - Organizers sign in with their BizTech exec account (Cognito). Their routes live under
- *   `bt.judging(e, y).admin` and send the ID token, never a code.
- */
+// Served by serverless-biztechapp/services/teams/handlerJudging.ts. Judges and teams have no
+// BizTech account: an organizer mints them a code, sent as X-Judging-Code. Organizers send a
+// Cognito ID token, and the backend keeps their work on separate /admin routes.
 import { entity, resource, action, link, str, int, num, bool, list, obj, record, ref, oneOf, type Fields } from "../core/define.js";
 
 export const judgingScope = {

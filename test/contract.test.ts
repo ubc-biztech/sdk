@@ -1,11 +1,5 @@
-/**
- * Contract tests: the declaration *claims* what the handlers return; these prove it against
- * api-dev. Without credentials only the public action runs. Set BT_JUDGING_CODE to a judge or
- * team code, and BT_ID_TOKEN to an exec's Cognito ID token, to exercise the rest. Nothing here
- * writes. BT_JUDGING_EVENT is `<slug>-<year>`, default `hellohacks-2027`.
- *
- * Skipped unless BT_CONTRACT=1, because it needs the network.
- */
+// Read-only, against api-dev. BT_CONTRACT=1 enables it; BT_JUDGING_CODE (a judge or team code) and
+// BT_ID_TOKEN (an exec's Cognito ID token) enable the credentialed cases; BT_JUDGING_EVENT is <slug>-<year>.
 import { describe, expect, it } from "vitest";
 import { createClient, EventNotFoundError, UnknownCodeError, NotAuthenticatedError } from "../src/index.js";
 

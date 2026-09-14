@@ -1,13 +1,7 @@
-/**
- * Hand-written runtime for the generated client. This file is NOT generated and is the
- * only place HTTP happens. It is deliberately small: path templating, auth header,
- * error mapping, and schema validation on both sides of the wire.
- */
 import type { ZodType } from "zod";
 
 // ─── Errors ───────────────────────────────────────────────────────────
 
-/** Base class for every error the SDK throws. `name` is the semantic error name (RD4). */
 export class BtError extends Error {
   override readonly name: string = "BtError";
   constructor(message: string, readonly details?: unknown) {
@@ -15,7 +9,6 @@ export class BtError extends Error {
   }
 }
 
-/** The backend returned a status that the action did not declare. */
 export class ApiError extends BtError {
   override readonly name = "ApiError";
   constructor(readonly action: string, readonly status: number, message: string, details?: unknown) {
@@ -23,7 +16,6 @@ export class ApiError extends BtError {
   }
 }
 
-/** The action needs a credential (`getCode` or `getToken`) and none was available. Nothing was sent. */
 export class NotAuthenticatedError extends BtError {
   override readonly name = "NotAuthenticatedError";
   constructor(readonly action: string, readonly auth: string, readonly credential: "code" | "token") {
@@ -31,7 +23,6 @@ export class NotAuthenticatedError extends BtError {
   }
 }
 
-/** The caller's input failed the declared input schema. Nothing was sent. */
 export class InputError extends BtError {
   override readonly name = "InputError";
   constructor(readonly action: string, issues: unknown) {
@@ -39,10 +30,7 @@ export class InputError extends BtError {
   }
 }
 
-/**
- * The backend's response did not match the declared output. This means the declaration
- * is wrong about reality. Fix the declaration; do not catch this in app code.
- */
+/** The declaration is wrong about the backend. Fix the declaration; do not catch this in app code. */
 export class ContractViolationError extends BtError {
   override readonly name = "ContractViolationError";
   constructor(readonly action: string, issues: unknown, readonly raw: unknown) {
@@ -53,43 +41,29 @@ export class ContractViolationError extends BtError {
 // ─── Config ───────────────────────────────────────────────────────────
 
 export type ClientConfig = {
-  /** e.g. https://api-dev.ubcbiztech.com — no trailing slash. */
+  /** No trailing slash. */
   baseUrl: string;
-  /**
-   * The signed-in judge's or team's code, or null when nobody is signed in with one. Sent as
-   * `X-Judging-Code` on every action whose role's credential is `code`.
-   */
+  /** Sent as `X-Judging-Code` on actions whose role's credential is `code`. */
   getCode?: () => Promise<string | null | undefined> | string | null | undefined;
-  /**
-   * The organizer's Cognito ID token, or null when signed out. Sent as `Authorization: Bearer`
-   * on every action whose role's credential is `token`.
-   */
+  /** The Cognito ID token, sent as `Authorization: Bearer` on actions whose role's credential is `token`. */
   getToken?: () => Promise<string | null | undefined> | string | null | undefined;
-  /** Override for tests or non-browser runtimes. Defaults to global fetch. */
   fetch?: typeof fetch;
-  /**
-   * When false, output is not validated and ContractViolationError is never thrown.
-   * Default true. Turn off only in a pinch during a live event; file the drift afterwards.
-   */
+  /** Default true. Turn off only in a pinch during a live event, then file the drift. */
   validateOutput?: boolean;
 };
 
 export type ErrorCtor = new (message: string, details?: unknown) => BtError;
 
 export type ActionMeta = {
-  /** `namespace.action` */
   key: string;
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-  /** May contain `{param}` segments. */
   path: string;
   query: readonly string[];
   fixedQuery: Record<string, string>;
   auth: string;
-  /** What `auth` sends: nothing, the judging code header, or the Cognito bearer token. */
   credential: "none" | "code" | "token";
   input?: ZodType;
   output: ZodType;
-  /** HTTP status → semantic error class. */
   errors: Record<number, ErrorCtor>;
 };
 
@@ -103,7 +77,6 @@ export class Runtime {
   }
 
   async call<T>(meta: ActionMeta, rawInput: unknown): Promise<T> {
-    // 1. Validate input against the declaration before anything leaves the process.
     let input: Record<string, unknown> = {};
     if (meta.input) {
       const parsed = meta.input.safeParse(rawInput ?? {});
@@ -111,7 +84,6 @@ export class Runtime {
       input = parsed.data as Record<string, unknown>;
     }
 
-    // 2. Build the URL: path params from {braces}, declared query fields, fixed query.
     const consumed = new Set<string>();
     const path = meta.path.replace(/\{(\w+)\}/g, (_, name: string) => {
       consumed.add(name);
@@ -126,7 +98,6 @@ export class Runtime {
     for (const [k, v] of Object.entries(meta.fixedQuery)) qs.set(k, v);
     const url = `${this.config.baseUrl}${path}${qs.size ? `?${qs}` : ""}`;
 
-    // 3. Body is whatever input remains, for non-GET methods.
     const headers: Record<string, string> = { Accept: "application/json" };
     let body: string | undefined;
     if (meta.method !== "GET") {
@@ -138,8 +109,7 @@ export class Runtime {
       }
     }
 
-    // 4. Credential. Public actions send nothing: the backend answers a wrong code with 401
-    //    even on public routes, so a stale code must not leak onto them.
+    // Public actions send nothing: the backend answers a wrong code with 401 even on public routes.
     if (meta.credential === "code") {
       const code = this.config.getCode ? await this.config.getCode() : null;
       if (!code) throw new NotAuthenticatedError(meta.key, meta.auth, "code");
@@ -150,7 +120,6 @@ export class Runtime {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // 5. Call, and map the status to a declared error or ApiError.
     const res = await this.fetchImpl(url, { method: meta.method, headers, body });
     const text = await res.text();
     let data: unknown = undefined;
@@ -171,7 +140,6 @@ export class Runtime {
       throw new ApiError(meta.key, res.status, message, data);
     }
 
-    // 6. Validate output. A mismatch is the declaration being wrong, not the caller.
     if (this.config.validateOutput === false) return data as T;
     const parsed = meta.output.safeParse(data);
     if (!parsed.success) throw new ContractViolationError(meta.key, parsed.error.issues, data);

@@ -27,7 +27,6 @@ describe("api declaration", () => {
       },
     };
     const msg = (() => { try { validate(bad); return ""; } catch (e) { return String(e); } })();
-    // Every message must say what is wrong AND what the options are / where to fix it.
     expect(msg).toMatch(/auth is "wizard" but the declared roles are "public"/);
     expect(msg).toMatch(/input field "id" is already provided by the chain \(id\)/);
     expect(msg).toMatch(/route\.path has \{nope\} but no field named "nope" exists\. Available: id/);

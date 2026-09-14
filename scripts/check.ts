@@ -1,8 +1,3 @@
-/**
- * `npm run check` — the one command. Runs everything CI runs and prints, for each step,
- * whether it passed and if not exactly what to do. You do not need to know what the steps
- * are or why they exist; you need to make them all green.
- */
 import { execSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -26,7 +21,6 @@ const steps: Step[] = [
     run: () => {
       const r = sh("npx tsx -e \"import('./src/core/define.js').then(async (d) => { const { api } = await import('./src/resources/index.js'); d.validate(api); })\"");
       if (r.ok) return null;
-      // Keep only the message; resolve the `*.ts (resource "x")` hints to the real file.
       let msg = r.out.replace(/^[\s\S]*?Error: /, "").replace(/\n\s+at [\s\S]*$/, "").replace(/\n\nNode\.js v[\s\S]*$/, "");
       msg = msg.replace(/src\/\*\.ts \(resource "(\w+)"\)/g, (_, r: string) => {
         const hit = sh(`grep -l 'singular: "${r}"' src/resources/*.ts`).out.split("\n")[0];

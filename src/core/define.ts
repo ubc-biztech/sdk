@@ -1,8 +1,3 @@
-/**
- * The builders every declaration file in src/resources/ is written with.
- * They carry data only, so generate.ts can walk the result with plain loops.
- * Every field requires a `description`; that text becomes the JSDoc on the client.
- */
 
 // ─── Fields ───────────────────────────────────────────────────────────
 
@@ -14,13 +9,11 @@ export type FieldSpec =
   | ({ kind: "number" } & Common)
   | ({ kind: "boolean" } & Common)
   | ({ kind: "enum"; values: readonly string[] } & Common)
-  /** Unknown / free-form JSON. Use sparingly; it is a confession that the shape is not declared. */
+  /** Only when the shape is genuinely unknown. */
   | ({ kind: "json" } & Common)
   | ({ kind: "array"; items: FieldSpec } & Common)
   | ({ kind: "object"; fields: Fields } & Common)
-  /** Map from string keys to one value shape. */
   | ({ kind: "record"; values: FieldSpec } & Common)
-  /** Embed a declared entity's shape (not a link). */
   | ({ kind: "ref"; entity: string } & Common);
 
 export type Fields = Record<string, FieldSpec>;
@@ -42,16 +35,11 @@ export type Credential = "none" | "code" | "token";
 
 export type RoleSpec = {
   description: string;
-  /**
-   * What the runtime sends for actions with this role: nothing, the `X-Judging-Code` header
-   * (`ClientConfig.getCode`), or `Authorization: Bearer` with the Cognito ID token (`ClientConfig.getToken`).
-   */
+  /** `code`: the `X-Judging-Code` header from `ClientConfig.getCode`. `token`: `Authorization: Bearer` from `ClientConfig.getToken`. */
   credential: Credential;
-  /** Roles this one satisfies. `judge` implies `judgingCode` means a judge may call any `judgingCode` action. Transitive. */
   implies?: readonly string[];
 };
 
-/** Every role `role` satisfies, including itself, following `implies` transitively. */
 export function rolesSatisfiedBy(roles: Roles, role: string): Set<string> {
   const out = new Set<string>();
   const walk = (r: string) => {
@@ -70,7 +58,7 @@ export type EntitySpec = {
   name: string;
   description: string;
   fields: Fields;
-  /** Where it lives today. Descriptive only; the SDK never creates tables. */
+  /** Documentation only; the SDK never creates tables. */
   storage?: { table: string; pk: string; sk?: string };
 };
 
@@ -81,10 +69,8 @@ export const entity = (spec: EntitySpec): EntitySpec => spec;
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 /**
- * Binding to an existing hand-written handler. Fields named in `{braces}` in `path`
- * (from the resource key or the action input) become path parameters; fields listed in
- * `query` become query parameters; everything else is the JSON body. `fixedQuery` is
- * appended verbatim (e.g. `count=true`).
+ * Fields named in `{braces}` in `path` become path parameters, fields listed in `query` become
+ * query parameters, everything else is the JSON body. `fixedQuery` is appended verbatim.
  */
 export type RouteSpec = {
   method: HttpMethod;
@@ -97,9 +83,7 @@ export type ErrorSpec = { status: number; description: string };
 
 export type ActionSpec = {
   description: string;
-  /** A key of `roles` in roles.ts. Checked by the validator. */
   auth: string;
-  /** What the caller passes. For instance actions the resource key is NOT repeated here. */
   input?: Fields;
   output: FieldSpec;
   errors: Record<string, ErrorSpec>;
@@ -112,16 +96,12 @@ export function action(spec: Omit<ActionSpec, "errors"> & { errors?: Record<stri
 
 // ─── Links ────────────────────────────────────────────────────────────
 
-/**
- * A declared, traversable relationship from a resource instance to another resource's
- * action. `bt.event(id, year).registrations()` is one HTTP call to `registrations.list`
- * with `map` applied to the instance key. Never a client-side loop.
- */
+/** `bt.<singular>(...key).<link>()` is one HTTP call to `via` with `map` applied to the key; never a client-side loop. */
 export type LinkSpec = {
   description: string;
-  /** `<plural-or-singular>.<action>` of the resolving action. */
+  /** `<plural-or-singular>.<action>` */
   via: string;
-  /** action input field ← this resource's key field */
+  /** `via` input field ← this resource's key field */
   map: Record<string, string>;
 };
 
@@ -130,29 +110,23 @@ export const link = (spec: LinkSpec): LinkSpec => spec;
 // ─── Resources ────────────────────────────────────────────────────────
 
 /**
- * The unit of the chained client surface.
+ * What a resource becomes on the client:
  *
- *   bt.<plural>.<collectionAction>(input)            e.g. bt.events.list()
- *   bt.<singular>(...key).<instanceAction>(input)    e.g. bt.event("blueprint", 2026).get()
- *   bt.<singular>(...key).<link>()                   e.g. bt.event("blueprint", 2026).registrations()
- *
- * A resource with an empty key is a singleton: `bt.<singular>.<instanceAction>()`.
- * Inside a scope, a keyless resource whose singular is the scope name sits on the scope
- * itself: `bt.judging(eventID, year).get()`.
+ *   bt.<plural>.<collectionAction>(input)
+ *   bt.<singular>(...key).<instanceAction>(input)
+ *   bt.<singular>(...key).<link>()
+ *   bt.<singular>.<instanceAction>(input)            when key is empty
+ *   bt.<scope.name>(...scope.key).<any of the above>  when scoped
+ *   bt.<scope.name>(...scope.key).<instanceAction>()  when scoped, keyless, and singular === scope.name
  */
 export type ResourceSpec = {
   singular: string;
   plural?: string;
   description: string;
-  /** The entity an instance represents, if any. Documentation only. */
+  /** Documentation only. */
   entity?: string;
-  /**
-   * Groups this resource under a keyed prefix: `bt.<scope.name>(...scope.key).<plural>…`.
-   * Every action's route may use the scope's key fields as path params. Resources that
-   * share a scope name must declare identical scope keys.
-   */
   scope?: { name: string; key: Fields; description: string };
-  /** Ordered: becomes the positional parameters of `bt.<singular>(...)`. */
+  /** In order, the positional parameters of `bt.<singular>(...)`. */
   key: Fields;
   collection: Record<string, ActionSpec>;
   instance: Record<string, ActionSpec>;
@@ -191,7 +165,6 @@ export type Api = {
   resources: Record<string, ResourceSpec>;
 };
 
-/** Every action with its full key, resource, and merged input (scope key + resource key + own). */
 export type FlatAction = {
   /** `[scope.]<plural|singular>.<name>` */
   key: string;
@@ -199,9 +172,9 @@ export type FlatAction = {
   level: "collection" | "instance";
   name: string;
   spec: ActionSpec;
-  /** Scope key, then resource key (instance only), then the action's own input. */
+  /** Scope key, then resource key, then the action's own input. */
   fullInput: Fields;
-  /** Fields that arrive positionally through the chain rather than in `input`. */
+  /** The part of `fullInput` that arrives through the chain, not `input`. */
   chainFields: Fields;
 };
 
@@ -220,13 +193,6 @@ export function flatten(o: Api): FlatAction[] {
   return out;
 }
 
-/**
- * Structural checks the type system cannot express. Throws with every problem at once.
- *
- * Messages are written for someone who has never seen this repo: each one says what is
- * wrong, what the valid options are, and which file to edit. If you are reading a message
- * from here and it does not tell you what to do, that is a bug in this function.
- */
 export function validate(o: Api): void {
   const problems: string[] = [];
   const flat = flatten(o);
@@ -322,7 +288,6 @@ export function validate(o: Api): void {
     if (!e.description.trim()) problems.push(`entity ${name}: description is empty.`);
     for (const [k, f] of Object.entries(e.fields)) walk(f, `entity ${name}: field ${k}`);
   }
-  // Anything that carries a description goes through here, so "TODO" left by the scaffold is caught in one place.
   const descriptions: [string, string][] = [
     ...flat.flatMap((a): [string, string][] => [[`${a.key} in ${file(a.resource)}`, a.spec.description], ...Object.entries(a.spec.errors).map(([en, e]): [string, string] => [`${a.key}: error ${en}`, e.description])]),
     ...Object.values(o.resources).map((r): [string, string] => [file(r), r.description]),
