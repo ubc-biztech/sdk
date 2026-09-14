@@ -12,8 +12,8 @@ minor. `npm run check` tells you which bump a change needs.
   send the Cognito ID token from `ClientConfig.getToken`, public actions send nothing.
 - **Breaking:** organizer actions moved under `bt.judging(e, y).admin` (`get`, `set`, `reviews`) to match
   the backend's `/admin` routes. There is no admin code and no `Judge.isAdmin`.
-- Layout: `src/resources/` (the API), `src/core/` (machinery), `scripts/` (tooling), `docs/reference/`
-  (generated) and `docs/guides/` (hand-written).
+- Layout: `src/resources/<service>/` (the API, one folder per backend service), `src/core/` (machinery),
+  `scripts/` (tooling), `docs/reference/` (generated) and `docs/guides/` (hand-written).
 
 ## 0.3.0 — 2026-09-12
 

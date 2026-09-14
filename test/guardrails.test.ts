@@ -4,24 +4,26 @@ import { api } from "../src/resources/index.js";
 import { flatten } from "../src/core/define.js";
 
 describe("guardrails", () => {
-  const declarationFiles = () => readdirSync("src/resources").filter((f) => f.endsWith(".ts") && !["index.ts", "roles.ts"].includes(f));
+  const services = () => readdirSync("src/resources", { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+  const declarationFiles = (service: string) => readdirSync(`src/resources/${service}`).filter((f) => f.endsWith(".ts") && f !== "index.ts");
 
-  it("every declaration file in src/resources/ is registered in src/resources/index.ts", () => {
-    const index = readFileSync("src/resources/index.ts", "utf8");
-    const unregistered = declarationFiles().filter((f) => !index.includes(`./${f.replace(/\.ts$/, ".js")}`));
-    expect(unregistered, "these files exist but nothing imports them, so they generate nothing. Add an import and register their exports in src/resources/index.ts, or run `npm run new` next time").toEqual([]);
+  it("every service folder is registered in src/resources/index.ts", () => {
+    const registry = readFileSync("src/resources/index.ts", "utf8");
+    const unregistered = services().filter((s) => !registry.includes(`./${s}/index.js`));
+    expect(unregistered, "these folders exist but the registry does not import them, so they generate nothing. Add `import * as <service> from \"./<service>/index.js\"` and spread its entities and resources, or run `npm run new` next time").toEqual([]);
   });
 
   it("every exported resource is in api.resources", async () => {
     const missing: string[] = [];
-    for (const f of declarationFiles()) {
-      const mod = (await import(/* @vite-ignore */ `../src/resources/${f.replace(/\.ts$/, ".js")}`)) as Record<string, unknown>;
-      for (const [name, v] of Object.entries(mod)) {
-        const isResource = typeof v === "object" && v !== null && "singular" in v && "instance" in v;
-        if (isResource && !Object.values(api.resources).includes(v as never)) missing.push(`${f}: ${name}`);
+    for (const s of services())
+      for (const f of declarationFiles(s)) {
+        const mod = (await import(/* @vite-ignore */ `../src/resources/${s}/${f.replace(/\.ts$/, ".js")}`)) as Record<string, unknown>;
+        for (const [name, v] of Object.entries(mod)) {
+          const isResource = typeof v === "object" && v !== null && "singular" in v && "instance" in v;
+          if (isResource && !Object.values(api.resources).includes(v as never)) missing.push(`${s}/${f}: ${name}`);
+        }
       }
-    }
-    expect(missing, "exported with resource() but not listed under `resources` in src/resources/index.ts, so bt.<name> does not exist").toEqual([]);
+    expect(missing, "exported with resource() but not listed under `resources` in its service's index.ts, so bt.<name> does not exist").toEqual([]);
   });
 
   it("every generated method is self-describing (JSDoc names its auth and route)", () => {

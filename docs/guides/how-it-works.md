@@ -9,7 +9,7 @@ you want to: it follows a single call all the way through, and then says what yo
 const event = await bt.judging("hellohacks", 2027).get();
 ```
 
-## 1. The declaration — `src/resources/judging.ts`
+## 1. The declaration — `src/resources/judging/`
 
 ```ts
 export const judgingScope = { name: "judging", key: { eventID: str({...}), year: int({...}) }, ... };  // → bt.judging(eventID, year)
@@ -28,8 +28,9 @@ export const judging = resource({
 });
 ```
 
-This is the only file a person edits. It is data, not code: builders like `str()` and `action()` just
-return objects. `src/resources/index.ts` lists every resource and entity so the generator can find them.
+These files are the only ones a person edits. They are data, not code: builders like `str()` and `action()`
+just return objects. Each service folder's `index.ts` collects its entities and resources, and
+`src/resources/index.ts` imports one line per service so the generator can find them.
 
 ## 2. Validation — `src/core/define.ts`, `validate()`
 
@@ -92,4 +93,4 @@ fails only on *new* drift.
 
 ## What to understand first, if you want to understand one thing
 
-`src/resources/judging.ts`, top to bottom. Every other declaration file will be the same shape.
+`src/resources/judging/event.ts`, top to bottom, then `entities.ts`. Every other service will be the same shape.

@@ -197,7 +197,7 @@ export function validate(o: Api): void {
   const problems: string[] = [];
   const flat = flatten(o);
   const roleList = Object.keys(o.roles).map((r) => `"${r}"`).join(", ");
-  const file = (r: ResourceSpec) => `src/resources/*.ts (resource "${r.singular}")`;
+  const file = (r: ResourceSpec) => `src/resources/*/*.ts (resource "${r.singular}")`;
 
   const seen = new Map<string, FlatAction>();
   for (const a of flat) {
@@ -243,7 +243,7 @@ export function validate(o: Api): void {
     else topNames.set(name, by);
   };
   for (const [rk, r] of Object.entries(o.resources)) {
-    if (!r.scope && rk !== r.singular) problems.push(`src/resources/index.ts: resources.${rk} has singular "${r.singular}". For unscoped resources the key must equal the singular; write \`${r.singular}: …\`.`);
+    if (!r.scope && rk !== r.singular) problems.push(`src/resources/<service>/index.ts: resources.${rk} has singular "${r.singular}". For unscoped resources the key must equal the singular; write \`${r.singular}: …\`.`);
     if (!r.scope) {
       claim(r.singular, `resource "${r.singular}"`);
       if (r.plural) claim(r.plural, `resource "${r.singular}"`);
@@ -259,7 +259,7 @@ export function validate(o: Api): void {
       if (!prev) claim(r.scope.name, `scope "${r.scope.name}"`);
       for (const k of Object.keys(r.key)) if (k in r.scope.key) problems.push(`${file(r)}: key field "${k}" is already a scope key field.`);
     }
-    if (r.entity && !(r.entity in o.entities)) problems.push(`${file(r)}: entity "${r.entity}" is not in src/resources/index.ts \`entities\`. Add it there.`);
+    if (r.entity && !(r.entity in o.entities)) problems.push(`${file(r)}: entity "${r.entity}" is not in its service's index.ts \`entities\`. Add it there.`);
     if (Object.keys(r.collection).length && !r.plural) problems.push(`${file(r)}: has collection actions but no \`plural\`. Add plural: "…" (it becomes bt.<plural>).`);
     if (!r.description.trim()) problems.push(`${file(r)}: description is empty.`);
     for (const [k, f] of Object.entries(r.key)) if (f.optional) problems.push(`${file(r)}: key field "${k}" cannot be optional; keys are positional arguments.`);
@@ -284,7 +284,7 @@ export function validate(o: Api): void {
     }
   }
   for (const [name, e] of Object.entries(o.entities)) {
-    if (e.name !== name) problems.push(`src/resources/index.ts: entities.${name} has name "${e.name}". The key must equal the name.`);
+    if (e.name !== name) problems.push(`src/resources/<service>/index.ts: entities.${name} has name "${e.name}". The key must equal the name.`);
     if (!e.description.trim()) problems.push(`entity ${name}: description is empty.`);
     for (const [k, f] of Object.entries(e.fields)) walk(f, `entity ${name}: field ${k}`);
   }
@@ -299,7 +299,7 @@ export function validate(o: Api): void {
   function walk(f: FieldSpec, at: string) {
     if (!f.description?.trim()) problems.push(`${at}: description is empty. Say what the value means, its unit or format, and when it is absent.`);
     else if (/\bTODO\b/.test(f.description)) problems.push(`${at}: description still says TODO. Replace it with what the value means, its unit or format, and when it is absent.`);
-    if (f.kind === "ref" && !(f.entity in o.entities)) problems.push(`${at}: ref to "${f.entity}", which is not in src/resources/index.ts \`entities\`. Declared: ${Object.keys(o.entities).join(", ")}.`);
+    if (f.kind === "ref" && !(f.entity in o.entities)) problems.push(`${at}: ref to "${f.entity}", which is not in its service's index.ts \`entities\`. Declared: ${Object.keys(o.entities).join(", ")}.`);
     if (f.kind === "array") walk(f.items, `${at}[]`);
     if (f.kind === "record") walk(f.values, `${at}{}`);
     if (f.kind === "object") for (const [k, c] of Object.entries(f.fields)) walk(c, `${at}.${k}`);

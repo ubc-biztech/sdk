@@ -6,7 +6,7 @@ This repo will outlive everyone who understands it. BizTech turns over its exec 
 realistic maintainer is someone with a partial and partly wrong idea of how it works, probably working
 with a coding agent. The repo is designed for that person:
 
-- **One file per change.** Adding or fixing an endpoint touches one declaration file in `src/resources/`.
+- **One file per change.** Adding or fixing an endpoint touches one file under `src/resources/<service>/`.
   Nothing else needs to be understood, opened, or edited.
 - **Wrong guesses are cheap.** Every mistake is caught by a machine that says which file and what to
   change. Nothing here can touch production; the contract test is read-only against `api-dev`.
@@ -17,8 +17,8 @@ that is a bug in this repo. Say so in an issue.
 
 ## Where things are
 
-The repo map is in [README.md](./README.md#changing-the-sdk). Short version: `src/resources/` is the API and the
-only folder you edit; `src/core/` is machinery; `src/generated/` is output; `scripts/` is tooling; `docs/reference/`
+The repo map is in [README.md](./README.md#changing-the-sdk). Short version: `src/resources/<service>/` is the API and the
+only place you edit, one folder per backend service; `src/core/` is machinery; `src/generated/` is output; `scripts/` is tooling; `docs/reference/`
 is generated and `docs/guides/` is hand-written.
 
 ## Recipes
@@ -26,10 +26,11 @@ is generated and `docs/guides/` is hand-written.
 ### Add an endpoint the SDK does not cover yet
 
 ```sh
-npm run new -- sticker stickers        # singular, then plural (omit plural for a singleton like judgingRound)
+npm run new -- events sticker stickers   # service folder, singular, plural (omit plural for a singleton)
 ```
 
-This creates `src/resources/sticker.ts` full of `TODO`s and registers it in `src/resources/index.ts`. Then:
+This creates `src/resources/events/sticker.ts` full of `TODO`s and registers it in the service's `index.ts`
+(creating the folder and adding it to `src/resources/index.ts` if the service is new). Then:
 
 1. Call the endpoint on `https://api-dev.ubcbiztech.com` (curl, browser, anything) and look at the
    real response. Find its path and method in `serverless-biztechapp/services/<service>/serverless.yml`.
@@ -66,7 +67,7 @@ rule is mechanical and lives in `scripts/semver.ts`; you never need to read it.
 Resources that all belong to one thing (an event's judging) share a `scope` and nest under it:
 `bt.judging(eventID, year).team(id).update(…)`. Declare the scope once, export it, and pass it to each
 resource. A keyless resource named after the scope sits on the scope itself: `bt.judging(e, y).get()`.
-See `src/resources/judging.ts`.
+See `src/resources/judging/`.
 
 ### Something else
 

@@ -135,17 +135,23 @@ lint rule against new uses. If the SDK does not cover an endpoint you need, the 
 
 ## Changing the SDK
 
-You do not need to understand this repo to add an endpoint. `npm run new -- <singular> <plural>`
+You do not need to understand this repo to add an endpoint. `npm run new -- <service> <singular> <plural>`
 scaffolds it, `npm run check` tells you what is left, and every error names the file and the fix.
 See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the recipes and [`docs/guides/how-it-works.md`](./docs/guides/how-it-works.md)
 if you want to follow one call end to end.
 
 ```
 src/
-  resources/      THE API. One file per area; the only folder you edit.
-    judging.ts      hackathon judging: entities, resources, actions, routes, errors
+  resources/      THE API. One folder per backend service; the only place you edit.
+    index.ts        registry: one import per service folder
     roles.ts        who may call what, and which credential each role sends
-    index.ts        registers every resources/ file so the generator finds it
+    judging/        hackathon judging
+      index.ts        the service's entities and resources, in two objects
+      shared.ts       scope, base path, phases, shared errors
+      entities.ts     JudgingEvent, Rubric, Judge, JudgingTeam, Review, …
+      event.ts        judging(e, y).info/get and judging(e, y).admin.*
+      teams.ts        judging(e, y).team(id).*
+      reviews.ts      judging(e, y).reviews.*
   core/           hand-written machinery. You should never need to open it.
     define.ts       the builders resources/ are written with (entity, resource, action, str, …) and the validator
     runtime.ts      the one place HTTP happens

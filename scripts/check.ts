@@ -22,9 +22,9 @@ const steps: Step[] = [
       const r = sh("npx tsx -e \"import('./src/core/define.js').then(async (d) => { const { api } = await import('./src/resources/index.js'); d.validate(api); })\"");
       if (r.ok) return null;
       let msg = r.out.replace(/^[\s\S]*?Error: /, "").replace(/\n\s+at [\s\S]*$/, "").replace(/\n\nNode\.js v[\s\S]*$/, "");
-      msg = msg.replace(/src\/\*\.ts \(resource "(\w+)"\)/g, (_, r: string) => {
-        const hit = sh(`grep -l 'singular: "${r}"' src/resources/*.ts`).out.split("\n")[0];
-        return hit || `src/resources/*.ts (resource "${r}")`;
+      msg = msg.replace(/src\/resources\/\*\/\*\.ts \(resource "(\w+)"\)/g, (_, r: string) => {
+        const hit = sh(`grep -l 'singular: "${r}"' src/resources/*/*.ts`).out.split("\n")[0];
+        return hit || `src/resources/*/*.ts (resource "${r}")`;
       });
       return msg;
     },
@@ -115,5 +115,5 @@ for (const f of failed) {
   console.log(`\n  → ${f.fix}\n`);
 }
 if (!existsSync(join(root, "CONTRIBUTING.md"))) process.exit(1);
-console.log(`Stuck? CONTRIBUTING.md has a worked example of every kind of change. ${readFileSync(join(root, "package.json"), "utf8").includes('"new"') ? "`npm run new -- <singular> <plural>` scaffolds a resource." : ""}`);
+console.log(`Stuck? CONTRIBUTING.md has a worked example of every kind of change. ${readFileSync(join(root, "package.json"), "utf8").includes('"new"') ? "`npm run new -- <service> <singular> <plural>` scaffolds a resource." : ""}`);
 process.exit(1);
