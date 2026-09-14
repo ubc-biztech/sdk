@@ -54,6 +54,16 @@ describe("credentials", () => {
 });
 
 describe("chained client", () => {
+  it("calls fetch with globalThis as `this`, as browsers require", async () => {
+    let seen: unknown = "unset";
+    const strict = async function (this: unknown) {
+      seen = this;
+      return new Response(JSON.stringify({ settings: { eventName: "HH", phase: "prelim" }, links: [] }), { status: 200 });
+    } as unknown as typeof fetch;
+    await createClient({ baseUrl: "https://x", fetch: strict }).judging("hellohacks", 2027).info();
+    expect(seen).toBe(globalThis);
+  });
+
   it("scope key + resource key + input compose; key fields are path params, the rest is the body", async () => {
     const { calls, fetch } = fake(200, { id: "t1", name: "n", members: [] });
     await createClient({ baseUrl: "https://x", fetch, getCode: () => "c" }).judging("hello hacks", 2027).team("t1").update({ name: "n", members: [] });

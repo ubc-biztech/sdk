@@ -72,8 +72,10 @@ export type ActionMeta = {
 export class Runtime {
   private readonly fetchImpl: typeof fetch;
   constructor(private readonly config: ClientConfig) {
-    this.fetchImpl = config.fetch ?? globalThis.fetch;
-    if (!this.fetchImpl) throw new Error("No fetch available; pass one in ClientConfig.fetch");
+    const f = config.fetch ?? globalThis.fetch;
+    if (!f) throw new Error("No fetch available; pass one in ClientConfig.fetch");
+    // Browsers throw "Illegal invocation" when window.fetch is called with any other `this`.
+    this.fetchImpl = f.bind(globalThis);
   }
 
   async call<T>(meta: ActionMeta, rawInput: unknown): Promise<T> {
