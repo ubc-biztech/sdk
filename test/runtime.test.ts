@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createClient, EventNotFoundError, ApiError, NotAuthenticatedError, InputError, ContractViolationError } from "../src/index.js";
+import { createClient, ApiError, NotAuthenticatedError, InputError, ContractViolationError, EventNotFoundError, UnknownCodeError, ForbiddenError, PhaseClosedError } from "../src/index.js";
 
 type Call = { url: string; init: RequestInit };
 function fake(status: number, body: unknown) {
@@ -10,140 +10,122 @@ function fake(status: number, body: unknown) {
   }) as unknown as typeof fetch;
   return { calls, fetch: f };
 }
-const event = { id: "blueprint", year: 2026, ename: "Blueprint", startDate: "s", endDate: "e", capac: 1, isPublished: true, createdAt: 1 };
+const headers = (c: Call) => c.init.headers as Record<string, string>;
+
+const settings = { eventName: "HelloHacks 2027", phase: "prelim" as const, finalsTeamIds: [], finalsJudgeIds: [], showTeamFeedback: true, allowJudgeSeeOthers: true, anonymizeTeams: false, lockSubmissions: false, maxImages: 10 };
+const doc = { updatedAt: "2026-09-13T00:00:00.000Z", settings, rubric: null, links: [], judges: [{ id: "j1", name: "Ada" }], teams: [{ id: "t1", name: "Team", members: ["a"] }] };
+const review = { id: "prelim__t1__j1", round: "prelim", teamId: "t1", judgeId: "j1", judgeName: "Ada", scores: { design: 4 }, feedback: "", total: 4, weightedTotal: 4, completedAt: "2026-09-13T00:00:00.000Z" };
+
+describe("credentials", () => {
+  it("public actions send no credential, even when a code and a token are available", async () => {
+    const { calls, fetch } = fake(200, { settings: { eventName: "HH", phase: "prelim" }, links: [] });
+    const r = await createClient({ baseUrl: "https://x", fetch, getCode: () => "AAAA-BBBB", getToken: () => "jwt" }).judging("hellohacks", 2027).info();
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027");
+    expect(headers(calls[0]!)["X-Judging-Code"]).toBeUndefined();
+    expect(headers(calls[0]!)["Authorization"]).toBeUndefined();
+    expect(r.settings.phase).toBe("prelim");
+  });
+
+  it("code actions send X-Judging-Code and never the token", async () => {
+    const { calls, fetch } = fake(200, { me: { role: "judge", id: "j1", name: "Ada" }, ...doc });
+    const r = await createClient({ baseUrl: "https://x", fetch, getCode: async () => "AAAA-BBBB", getToken: () => "jwt" }).judging("hellohacks", 2027).get();
+    expect(headers(calls[0]!)["X-Judging-Code"]).toBe("AAAA-BBBB");
+    expect(headers(calls[0]!)["Authorization"]).toBeUndefined();
+    expect(r.me?.role).toBe("judge");
+  });
+
+  it("token actions send the bearer token and never the code", async () => {
+    const { calls, fetch } = fake(200, doc);
+    await createClient({ baseUrl: "https://x", fetch, getCode: () => "AAAA-BBBB", getToken: async () => "jwt" }).judging("hellohacks", 2027).admin.get();
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/admin");
+    expect(headers(calls[0]!)["Authorization"]).toBe("Bearer jwt");
+    expect(headers(calls[0]!)["X-Judging-Code"]).toBeUndefined();
+  });
+
+  it("refuses a code action without a code, and a token action without a token, before any HTTP", async () => {
+    const { calls, fetch } = fake(200, doc);
+    const j = createClient({ baseUrl: "https://x", fetch, getToken: () => "jwt" }).judging("hellohacks", 2027);
+    await expect(j.get()).rejects.toBeInstanceOf(NotAuthenticatedError);
+    const err = await createClient({ baseUrl: "https://x", fetch, getCode: () => "AAAA-BBBB" }).judging("hellohacks", 2027).admin.get().catch((e) => e);
+    expect(err).toBeInstanceOf(NotAuthenticatedError);
+    expect(err.message).toContain("getToken");
+    expect(calls).toHaveLength(0);
+  });
+});
 
 describe("chained client", () => {
-  it("instance key becomes path params, URL-encoded", async () => {
-    const { calls, fetch } = fake(200, event);
-    const bt = createClient({ baseUrl: "https://x", fetch });
-    await bt.event("blue print", 2026).get();
-    expect(calls[0]!.url).toBe("https://x/events/blue%20print/2026");
-    expect(calls[0]!.init.method).toBe("GET");
-    expect(calls[0]!.init.body).toBeUndefined();
-  });
-
-  it("collection actions send declared query fields and omit undefined", async () => {
-    const { calls, fetch } = fake(200, []);
-    const bt = createClient({ baseUrl: "https://x", fetch });
-    await bt.events.list();
-    await bt.events.list({ id: "blueprint" });
-    expect(calls.map((c) => c.url)).toEqual(["https://x/events", "https://x/events?id=blueprint"]);
-  });
-
-  it("fixedQuery is appended", async () => {
-    const { calls, fetch } = fake(200, { registeredCount: 1, checkedInCount: 0, waitlistCount: 0 });
-    await createClient({ baseUrl: "https://x", fetch }).event("a", 2026).counts();
-    expect(calls[0]!.url).toBe("https://x/events/a/2026?count=true");
-  });
-
-  it("instance action with input merges key into the body, and path params are not repeated in the body", async () => {
-    const { calls, fetch } = fake(200, { message: "ok" });
-    const bt = createClient({ baseUrl: "https://x", fetch });
-    await bt.team("t1").assignJudges({ judgeIDs: ["j@x.com"] });
-    expect(calls[0]!.url).toBe("https://x/team/judge/currentTeam/t1");
+  it("scope key + resource key + input compose; key fields are path params, the rest is the body", async () => {
+    const { calls, fetch } = fake(200, { id: "t1", name: "n", members: [] });
+    await createClient({ baseUrl: "https://x", fetch, getCode: () => "c" }).judging("hello hacks", 2027).team("t1").update({ name: "n", members: [] });
+    expect(calls[0]!.url).toBe("https://x/judging/hello%20hacks/2027/teams/t1");
     expect(calls[0]!.init.method).toBe("PUT");
-    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ judgeIDs: ["j@x.com"] });
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ name: "n", members: [] });
   });
 
-  it("instance key that is not a path param goes into the body", async () => {
-    const { calls, fetch } = fake(200, { message: "ok" });
-    const bt = createClient({ baseUrl: "https://x", fetch });
-    await bt.legacyJudge("j@x.com").submit({ teamID: "t1", eventID: "hh", year: 2026, scores: { metric1: 1, metric2: 2, metric3: 3, metric4: 4, metric5: 5 } });
-    const body = JSON.parse(calls[0]!.init.body as string);
-    expect(body.judgeID).toBe("j@x.com");
-    expect(body.teamID).toBe("t1");
+  it("a review goes to PUT /reviews/{teamId} with only scores and feedback in the body", async () => {
+    const { calls, fetch } = fake(200, review);
+    const r = await createClient({ baseUrl: "https://x", fetch, getCode: () => "c" }).judging("hellohacks", 2027).team("t1").review({ scores: { design: 4 }, feedback: "nice" });
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/reviews/t1");
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ scores: { design: 4 }, feedback: "nice" });
+    expect(r.total).toBe(4);
   });
 
-  it("singleton resources are objects, not functions", async () => {
-    const { calls, fetch } = fake(200, { round: "2" });
-    const bt = createClient({ baseUrl: "https://x", fetch });
-    const r = await bt.judgingRound.get();
-    expect(r.round).toBe("2");
-    await createClient({ baseUrl: "https://x", fetch: fake(200, { message: "ok" }).fetch }).judgingRound.set({ round: "3" });
-    expect(calls[0]!.url).toBe("https://x/team/round");
-  });
-
-  it("links resolve with one call to the declared action, mapping the key", async () => {
+  it("collection filters become query params and undefined ones are omitted", async () => {
     const { calls, fetch } = fake(200, []);
-    const bt = createClient({ baseUrl: "https://x", fetch, getToken: () => "tok" });
-    await bt.event("blueprint", 2026).registrations();
-    await bt.event("blueprint", 2026).teams();
-    expect(calls.map((c) => c.url)).toEqual(["https://x/registrations?eventID=blueprint&year=2026", "https://x/team/blueprint/2026"]);
+    const j = createClient({ baseUrl: "https://x", fetch, getCode: () => "c", getToken: () => "t" }).judging("hellohacks", 2027);
+    await j.reviews.list();
+    await j.reviews.list({ round: "prelim", judgeId: "j1" });
+    await j.admin.reviews({ teamId: "t1" });
+    expect(calls.map((c) => c.url)).toEqual(["https://x/judging/hellohacks/2027/reviews", "https://x/judging/hellohacks/2027/reviews?round=prelim&judgeId=j1", "https://x/judging/hellohacks/2027/admin/reviews?teamId=t1"]);
+    expect(calls.every((c) => c.init.body === undefined)).toBe(true);
   });
 
+  it("links resolve with one call to the declared action, mapping scope and key fields", async () => {
+    const { calls, fetch } = fake(200, []);
+    await createClient({ baseUrl: "https://x", fetch, getCode: () => "c" }).judging("hellohacks", 2027).team("t1").reviews();
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/reviews?teamId=t1");
+  });
+
+  it("admin.set sends the whole document and returns it with codes", async () => {
+    const withCodes = { ...doc, judges: [{ id: "j1", name: "Ada", code: "AAAA-BBBB" }], teams: [{ id: "t1", name: "Team", members: ["a"], code: "CCCC-DDDD" }] };
+    const { calls, fetch } = fake(200, withCodes);
+    const r = await createClient({ baseUrl: "https://x", fetch, getToken: () => "jwt" }).judging("hellohacks", 2027).admin.set({ settings, rubric: null, links: [], judges: [{ name: "Ada" }], teams: [{ id: "t1", name: "Team", members: ["a"] }] });
+    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027");
+    expect(calls[0]!.init.method).toBe("PUT");
+    expect(JSON.parse(calls[0]!.init.body as string).judges).toEqual([{ name: "Ada" }]);
+    expect(r.judges[0]!.code).toBe("AAAA-BBBB");
+  });
+});
+
+describe("errors", () => {
   it("maps a declared status to its semantic error, and undeclared to ApiError", async () => {
-    const bt = createClient({ baseUrl: "https://x", fetch: fake(404, { message: "nope" }).fetch });
-    await expect(bt.event("a", 1).get()).rejects.toBeInstanceOf(EventNotFoundError);
-    const err = await createClient({ baseUrl: "https://x", fetch: fake(500, { message: "boom" }).fetch }).event("a", 1).get().catch((e) => e);
+    const j = (status: number, body: unknown, cfg: Record<string, unknown> = {}) => createClient({ baseUrl: "https://x", fetch: fake(status, body).fetch, getCode: () => "c", getToken: () => "t", ...cfg }).judging("hellohacks", 2027);
+    await expect(j(404, { message: "not found" }).info()).rejects.toBeInstanceOf(EventNotFoundError);
+    await expect(j(401, { message: "Code not recognized" }).get()).rejects.toBeInstanceOf(UnknownCodeError);
+    await expect(j(403, { message: "Admin access required" }).admin.get()).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(j(409, { message: "Judging is not open" }).team("t1").review({ scores: {} })).rejects.toBeInstanceOf(PhaseClosedError);
+    const err = await j(500, { message: "boom" }).info().catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(500);
     expect(err.message).toContain("boom");
   });
 
-  it("refuses non-public actions without a token, before any HTTP", async () => {
-    const { calls, fetch } = fake(200, []);
-    await expect(createClient({ baseUrl: "https://x", fetch }).registrations.list({ email: "a@b.c" })).rejects.toBeInstanceOf(NotAuthenticatedError);
-    expect(calls).toHaveLength(0);
-  });
-
-  it("attaches the bearer token when available", async () => {
-    const { calls, fetch } = fake(200, { id: "a@b.c" });
-    await createClient({ baseUrl: "https://x", fetch, getToken: async () => "tok" }).me.get();
-    expect((calls[0]!.init.headers as Record<string, string>)["Authorization"]).toBe("Bearer tok");
-    expect(calls[0]!.url).toBe("https://x/users/self");
-  });
-
   it("rejects bad input before sending", async () => {
-    const { calls, fetch } = fake(200, event);
-    await expect(createClient({ baseUrl: "https://x", fetch }).event("a", "2026" as unknown as number).get()).rejects.toBeInstanceOf(InputError);
+    const { calls, fetch } = fake(200, doc);
+    await expect(createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", "2027" as unknown as number).info()).rejects.toBeInstanceOf(InputError);
+    await expect(createClient({ baseUrl: "https://x", fetch, getCode: () => "c" }).judging("hellohacks", 2027).team("t1").update({ name: "n" } as never)).rejects.toBeInstanceOf(InputError);
     expect(calls).toHaveLength(0);
   });
 
   it("throws ContractViolationError when the response disagrees with the declaration, unless validation is off", async () => {
-    await expect(createClient({ baseUrl: "https://x", fetch: fake(200, { id: "a" }).fetch }).event("a", 1).get()).rejects.toBeInstanceOf(ContractViolationError);
-    await expect(createClient({ baseUrl: "https://x", fetch: fake(200, { id: "a" }).fetch, validateOutput: false }).event("a", 1).get()).resolves.toEqual({ id: "a" });
+    await expect(createClient({ baseUrl: "https://x", fetch: fake(200, { settings: {} }).fetch }).judging("hellohacks", 2027).info()).rejects.toBeInstanceOf(ContractViolationError);
+    await expect(createClient({ baseUrl: "https://x", fetch: fake(200, { settings: {} }).fetch, validateOutput: false }).judging("hellohacks", 2027).info()).resolves.toEqual({ settings: {} });
   });
 
-  it("strips undeclared fields so the declaration is the contract", async () => {
-    const e = await createClient({ baseUrl: "https://x", fetch: fake(200, { ...event, secret: 1 }).fetch }).event("a", 1).get();
-    expect("secret" in e).toBe(false);
-  });
-
-  it("accepts nullable fields", async () => {
-    const r = await createClient({ baseUrl: "https://x", fetch: fake(200, { message: "m", currentTeamID: "t", currentTeamName: null }).fetch }).legacyJudge("j").currentTeam();
-    expect(r.currentTeamName).toBeNull();
-  });
-});
-
-describe("scoped resources", () => {
-  const ok = (body: unknown) => fake(200, body);
-  const info = { settings: { eventName: "HH", phase: "prelim" }, links: [] };
-  it("scope key flows into the path; a keyless resource named after the scope sits on it", async () => {
-    const { calls, fetch } = ok(info);
-    const r = await createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).info();
-    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027");
-    expect(r.settings.phase).toBe("prelim");
-  });
-  it("scope key + resource key + input compose, with key fields kept out of the body", async () => {
-    const { calls, fetch } = ok({ id: "t1", name: "n", members: [] });
-    await createClient({ baseUrl: "https://x", fetch, getToken: () => "code" }).judging("hellohacks", 2027).team("t1").update({ name: "n", members: [] });
-    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/teams/t1");
-    expect(calls[0]!.init.method).toBe("PUT");
-    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ name: "n", members: [] });
-  });
-  it("scoped links map scope and key fields onto the target's input", async () => {
-    const { calls, fetch } = ok([]);
-    await createClient({ baseUrl: "https://x", fetch, getToken: () => "code" }).judging("hellohacks", 2027).team("t1").reviews();
-    expect(calls[0]!.url).toBe("https://x/judging/hellohacks/2027/reviews?teamId=t1");
-  });
-  it("code roles require a token like any non-public action", async () => {
-    const { calls, fetch } = ok([]);
-    await expect(createClient({ baseUrl: "https://x", fetch }).judging("hellohacks", 2027).get()).rejects.toBeInstanceOf(NotAuthenticatedError);
-    expect(calls).toHaveLength(0);
-  });
-  it("a 401 on get is UnknownCodeError", async () => {
-    const { fetch } = fake(401, { message: "Code not recognized" });
-    const err = await createClient({ baseUrl: "https://x", fetch, getToken: () => "bad" }).judging("hellohacks", 2027).get().catch((e) => e);
-    expect(err.name).toBe("UnknownCodeError");
+  it("strips undeclared fields so the declaration is the contract, and accepts nullable and optional ones", async () => {
+    const r = await createClient({ baseUrl: "https://x", fetch: fake(200, { ...doc, secret: 1 }).fetch, getToken: () => "t" }).judging("hellohacks", 2027).admin.get();
+    expect("secret" in r).toBe(false);
+    expect(r.rubric).toBeNull();
+    expect(r.me).toBeUndefined();
   });
 });

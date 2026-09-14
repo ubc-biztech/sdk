@@ -38,9 +38,16 @@ export const ref = (entity: EntitySpec, o: Common): FieldSpec => ({ kind: "ref",
 
 // ─── Roles ────────────────────────────────────────────────────────────
 
+export type Credential = "none" | "code" | "token";
+
 export type RoleSpec = {
   description: string;
-  /** Roles this one satisfies. `judgingAdmin` implies `judge` means an admin may call judge-only actions. Transitive. */
+  /**
+   * What the runtime sends for actions with this role: nothing, the `X-Judging-Code` header
+   * (`ClientConfig.getCode`), or `Authorization: Bearer` with the Cognito ID token (`ClientConfig.getToken`).
+   */
+  credential: Credential;
+  /** Roles this one satisfies. `judge` implies `judgingCode` means a judge may call any `judgingCode` action. Transitive. */
   implies?: readonly string[];
 };
 
@@ -303,7 +310,13 @@ export function validate(o: Api): void {
       if (target) for (const [inF, f] of Object.entries(target.fullInput)) if (!f.optional && !(inF in l.map)) problems.push(`${atl}: ${l.via} requires "${inF}" but map does not provide it. Add \`${inF}: "<key field>"\` to map.`);
     }
   }
-  for (const [name, r] of Object.entries(o.roles)) for (const i of r.implies ?? []) if (!(i in o.roles)) problems.push(`src/roles.ts: role ${name} implies "${i}", which is not a role. Declared: ${roleList}.`);
+  for (const [name, r] of Object.entries(o.roles)) {
+    if (!["none", "code", "token"].includes(r.credential)) problems.push(`src/roles.ts: role ${name} has credential "${r.credential}"; it must be "none", "code" or "token".`);
+    for (const i of r.implies ?? []) {
+      if (!(i in o.roles)) problems.push(`src/roles.ts: role ${name} implies "${i}", which is not a role. Declared: ${roleList}.`);
+      else if (o.roles[i]!.credential !== r.credential) problems.push(`src/roles.ts: role ${name} (${r.credential}) implies ${i} (${o.roles[i]!.credential}); a role can only imply roles that send the same credential.`);
+    }
+  }
   for (const [name, e] of Object.entries(o.entities)) {
     if (e.name !== name) problems.push(`src/api.ts: entities.${name} has name "${e.name}". The key must equal the name.`);
     if (!e.description.trim()) problems.push(`entity ${name}: description is empty.`);

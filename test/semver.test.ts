@@ -10,25 +10,26 @@ describe("semver classification", () => {
 
   it("adding an optional field, action, link, role or resource → minor", () => {
     const n = clone();
-    n.entities.Event!.fields.venueMapUrl = { kind: "string", optional: true, description: "x" };
-    n.roles.exec = { description: "x" };
-    n.resources.event!.instance.archive = { ...n.resources.event!.instance.get!, description: "x" };
-    n.resources.team!.links.event = { description: "x", via: "event.get", map: { id: "id" } };
+    n.entities.JudgingTeam!.fields.videoUrl = { kind: "string", optional: true, description: "x" };
+    n.roles.exec = { credential: "token", description: "x" };
+    n.resources.judging!.instance.archive = { ...n.resources.judging!.instance.info!, description: "x" };
+    n.resources.judgingTeam!.links.event = { description: "x", via: "judging.info", map: { eventID: "eventID", year: "year" } };
     n.resources.widget = { singular: "widget", description: "x", key: {}, collection: {}, instance: {}, links: {} };
     expect(classify(api, n).bump).toBe("minor");
   });
 
   it("breaking changes → major", () => {
     for (const mutate of [
-      (n: Api) => delete n.entities.Event!.fields.ename,
-      (n: Api) => (n.resources.event!.collection.list!.auth = "admin"),
-      (n: Api) => (n.entities.Event!.fields.startDate!.optional = true),
-      (n: Api) => (n.resources.event!.instance.get!.route.path = "/event/{id}/{year}"),
-      (n: Api) => (n.resources.registration!.collection.list!.input!.email!.optional = false),
-      (n: Api) => delete n.resources.event!.links.teams,
-      (n: Api) => (n.resources.event!.key = { slug: { kind: "string", description: "x" } }),
-      (n: Api) => delete n.resources.judgingRound,
-      (n: Api) => delete n.resources.event!.instance.get!.errors.EventNotFound,
+      (n: Api) => delete n.entities.Review!.fields.total,
+      (n: Api) => (n.resources.judging!.instance.info!.auth = "admin"),
+      (n: Api) => (n.entities.JudgingTeam!.fields.name!.optional = true),
+      (n: Api) => (n.resources.judging!.instance.get!.route.path = "/judging/{eventID}/{year}/me"),
+      (n: Api) => (n.resources.review!.collection.list!.input!.round!.optional = false),
+      (n: Api) => delete n.resources.judgingTeam!.links.reviews,
+      (n: Api) => (n.resources.judgingTeam!.key = { slug: { kind: "string", description: "x" } }),
+      (n: Api) => delete n.resources.judgingAdmin,
+      (n: Api) => delete n.resources.judging!.instance.info!.errors.EventNotFound,
+      (n: Api) => delete n.roles.admin,
     ]) {
       const n = clone();
       mutate(n);
@@ -38,8 +39,8 @@ describe("semver classification", () => {
 
   it("tightening an output or loosening an input → minor", () => {
     const n = clone();
-    n.entities.Event!.fields.description!.optional = false;
-    n.resources.registration!.collection.list!.input!.year!.optional = true;
+    n.entities.JudgingTeam!.fields.description!.optional = false;
+    n.resources.judgingTeam!.instance.update!.input!.members!.optional = true;
     expect(classify(api, n).bump).toBe("minor");
   });
 });

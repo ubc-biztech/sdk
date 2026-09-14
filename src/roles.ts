@@ -4,24 +4,21 @@ import type { Roles } from "./define.js";
  * The vocabulary every action's `auth` refers to. Nothing else may invent a role.
  * Adding a role is a minor version; removing or renaming one is a major.
  *
- * Two families:
+ * Each role says what credential the runtime sends:
  *
- * Cognito roles (`authenticated`, `member`, `admin`) come from the user pool JWT. Only
- * `public` and `authenticated` are enforced anywhere today; `member` and `admin` are declared
- * so actions can be honest about intent.
+ * - `none`  — nothing. Public.
+ * - `code`  — the `X-Judging-Code` header, from `ClientConfig.getCode`. Judges and teams have no
+ *             BizTech account; an organizer mints their codes and the backend resolves a code to
+ *             who it belongs to.
+ * - `token` — `Authorization: Bearer <Cognito ID token>`, from `ClientConfig.getToken`. Organizers
+ *             sign in with their BizTech exec account; the backend checks it is an admin.
  *
- * Code roles (`judgingCode`, `judge`, `judgingAdmin`) are for hackathon judging, where judges
- * and teams have no BizTech account. The bearer token is a short code minted by the backend.
- * An admin code satisfies every judge action; a judge or team code satisfies every
- * `judgingCode` action. Code roles never grant anything outside `bt.judging(…)`.
+ * A code never satisfies a token action and a token never satisfies a code action. The backend
+ * exposes organizer work on separate routes, so the two families never meet on one action.
  */
 export const roles: Roles = {
-  public: { description: "No token required. Anyone on the internet." },
-  authenticated: { description: "Any valid Cognito JWT for the environment's user pool." },
-  member: { description: "Authenticated, and the caller's biztechUsers record has isMember === true.", implies: ["authenticated"] },
-  admin: { description: "Today: caller's email ends with @ubcbiztech.com. Intended: Cognito group `admin`.", implies: ["member"] },
-
-  judgingCode: { description: "Bearer token is any valid code for the event: team, judge or admin. Row-level filtering (a team sees only its own reviews) is the backend's job." },
-  judge: { description: "Bearer token is a judge code for the event.", implies: ["judgingCode"] },
-  judgingAdmin: { description: "Bearer token is the event's organizer code.", implies: ["judge"] },
+  public: { credential: "none", description: "No credential. Anyone on the internet." },
+  judgingCode: { credential: "code", description: "Any code the event knows: a team's or a judge's. Row-level filtering (a team sees only its own reviews) is the backend's job." },
+  judge: { credential: "code", implies: ["judgingCode"], description: "A judge's code for the event. A team code gets 403." },
+  admin: { credential: "token", description: "A Cognito ID token for a BizTech exec (today: a verified @ubcbiztech.com email). Not a code." },
 };

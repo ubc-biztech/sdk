@@ -1,8 +1,11 @@
 # @ubc-biztech/sdk
 
-Typed client for BizTech club data. One call per method, one HTTP request per call, to
-`api.ubcbiztech.com`. Everything below is generated from one declaration, so the types, the
-error classes and the JSDoc on every method agree with each other by construction.
+Typed client for the BizTech API. One call per method, one HTTP request per call. Everything
+below is generated from one declaration, so the types, the error classes and the JSDoc on every
+method agree with each other by construction.
+
+Today the SDK covers **hackathon judging** (the `bt-judging` portal). Other services come back one
+declaration file at a time; see [Changing the SDK](#changing-the-sdk).
 
 ## Install
 
@@ -25,7 +28,9 @@ export const bt = createClient({
   baseUrl: process.env.NEXT_PUBLIC_STAGE === "production"
     ? "https://api.ubcbiztech.com"
     : "https://api-dev.ubcbiztech.com",
-  // Return the Cognito ID token, or null when signed out. Omit for public-only apps.
+  // The signed-in judge's or team's code, or null. Sent as X-Judging-Code.
+  getCode: () => getSession()?.code ?? null,
+  // The organizer's Cognito ID token, or null. Sent as Authorization: Bearer.
   getToken: async () => (await fetchAuthSession()).tokens?.idToken?.toString() ?? null,
 });
 ```
@@ -33,17 +38,20 @@ export const bt = createClient({
 | Option | Type | Notes |
 |---|---|---|
 | `baseUrl` | `string` | No trailing slash. |
-| `getToken` | `() => string \| null \| Promise<…>` | Called on every request. Actions whose auth is not `public` throw `NotAuthenticatedError` before any HTTP if it returns null. |
+| `getCode` | `() => string \| null \| Promise<…>` | Called on every `judgingCode` / `judge` action. Returning null throws `NotAuthenticatedError` before any HTTP. |
+| `getToken` | `() => string \| null \| Promise<…>` | Called on every `admin` action. Same rule. |
 | `fetch` | `typeof fetch` | Override for tests or non-browser runtimes. |
 | `validateOutput` | `boolean` | Default `true`. Set `false` only in an emergency during a live event, then file the drift. |
+
+Public actions send neither credential. Each method's JSDoc says which one it needs.
 
 ## How calls are shaped
 
 ```ts
-bt.<plural>.<action>(input)              // collection:  bt.events.list()
-bt.<singular>(...key).<action>(input)    // one thing:   bt.event("blueprint", 2026).get()
-bt.<singular>(...key).<link>()           // relationship: bt.event("blueprint", 2026).teams()
-bt.<singleton>.<action>(input)           // no key:      bt.me.get(), bt.judgingRound.get()
+bt.judging(eventID, year).<action>(input)           // the event:     bt.judging("hellohacks", 2027).get()
+bt.judging(eventID, year).admin.<action>(input)     // organizer:     ….admin.set(doc)
+bt.judging(eventID, year).team(id).<action>(input)  // one team:      ….team(id).review({ scores })
+bt.judging(eventID, year).reviews.list(input)       // collection:    ….reviews.list({ round: "prelim" })
 ```
 
 Every method returns a `Promise` of a typed value. Input is validated before sending; output is
@@ -53,81 +61,37 @@ validated after, and fields the declaration does not include are stripped.
 
 Full per-method reference with input and output tables: [`docs/`](./docs/README.md).
 
-### Events
-
-```ts
-const events = await bt.events.list();                     // Event[], all years, includes unpublished
-const blue   = await bt.events.list({ id: "blueprint" });  // all years of one event
-const event  = await bt.event("blueprint", 2026).get();    // full record; throws EventNotFoundError
-const counts = await bt.event("blueprint", 2026).counts(); // { registeredCount, checkedInCount, waitlistCount }
-const regs   = await bt.event("blueprint", 2026).registrations(); // Registration[]  (token required)
-const teams  = await bt.event("blueprint", 2026).teams();         // Team[]          (token required)
-```
-
-`events.list` is public and returns unpublished rows too. Filter on `isPublished` for member-facing UI.
-
-### Registrations
-
-```ts
-const mine  = await bt.registrations.list({ email: "me@example.com" });
-const forEv = await bt.registrations.list({ eventID: "blueprint", year: 2026 });
-```
-
-At least one of `email` or the `eventID` + `year` pair is required. Non-admins only receive their own.
-
-### Users
-
-```ts
-const me   = await bt.me.get();                       // the signed-in user; throws UserNotFoundError
-const user = await bt.user("someone@ubc.ca").get();   // admin only
-```
-
-### Teams
-
-```ts
-const teams = await bt.teams.list({ eventID: "hellohacks", year: 2027 });   // memberIDs only for admins
-const board = await bt.teams.scores();                                      // NormalizedTeamScore[], public
-const mine  = await bt.teams.forUser({ user_id: "me@ubc.ca", eventID: "hellohacks", year: 2027 });
-
-await bt.teams.create({ team_name: "productx", eventID: "hellohacks", year: 2027, memberIDs: ["a@ubc.ca"] });
-await bt.teams.join({ memberID: "b@ubc.ca", eventID: "hellohacks", year: 2027, teamID });
-await bt.teams.leave({ memberID: "b@ubc.ca", eventID: "hellohacks", year: 2027 });
-await bt.teams.rename({ user_id: "a@ubc.ca", eventID: "hellohacks", year: 2027, team_name: "producty" });
-await bt.teams.addPoints({ user_id: "a@ubc.ca", eventID: "hellohacks", year: 2027, change_points: 10 });
-
-const fb = await bt.team(teamID).feedback();                     // { scores: { "1": JudgeSubmission[] } }
-await bt.team(teamID).assignJudges({ judgeIDs: ["j@corp.com"] }); // throws AllJudgesDoneError (409)
-```
-
-In `teams.scores()` the `teamID` field is `"<teamId>;<round>"`. Split on `;` to get the team.
-
 ### Hackathon judging
 
-`bt.judging(eventID, year)` is the HelloHacks judging portal's API. Judges and teams have no BizTech
-account: they log in with a **code**, and the code is the bearer token from then on.
+One event's judging is one document on the backend: settings, rubric, links, judges and teams.
+Reviews are separate rows. Two kinds of caller:
+
+- **Judges and teams** have no BizTech account. An organizer mints them a **code**; the code goes in
+  `X-Judging-Code` on every call.
+- **Organizers** sign in with their BizTech exec account. Their calls live under `.admin` and send the
+  Cognito ID token. A code never works on an admin call and a token never works on a code call.
 
 ```ts
 const j = bt.judging("hellohacks", 2027);
 
-const info  = await j.info();        // public: { settings: { eventName, phase }, links }
-const event = await j.get();         // with a code: settings, rubric, links, judges, teams, and `me`
-                                     // throws UnknownCodeError (401) when the code is wrong, so this is login
+// Before login (no credential)
+const info = await j.info();   // { settings: { eventName, phase }, links }; EventNotFoundError until an organizer sets it up
 
-await j.team(teamId).update({ name, members, description, github, devpost, imageUrls });  // the team itself, during submission
-await j.team(teamId).review({ scores: { design: 4, impact: 5 }, feedback: "…" });         // a judge; totals computed server-side
-const reviews = await j.reviews.list({ round: "prelim" });                                 // filtered by what the caller may see
+// With a code. This is also login: UnknownCodeError (401) means the code is wrong.
+const event = await j.get();   // settings, rubric, links, judges, teams (no codes), and `me`: { role: "judge" | "team", id, name }
 
-// Organizer: the event is one document, read with get() and replaced whole with set().
-await j.set({ ...event, settings: { ...event.settings, phase: "finals" } });   // new judges/teams get ids and codes minted
+await j.team(teamId).update({ name, members, description, github, devpost, imageUrls }); // the team itself, during `submission`
+await j.team(teamId).review({ scores: { design: 4, impact: 5 }, feedback: "…" });       // a judge; totals computed server-side
+const mine = await j.reviews.list({ round: "prelim" });                                   // filtered by what the code may see
+
+// Organizer (Cognito token). The event is one document: read it whole, replace it whole.
+const doc = await j.admin.get();                                                          // every judge and team code included
+await j.admin.set({ ...doc, settings: { ...doc.settings, phase: "finals" } });            // new judges/teams get ids and codes minted
+const all = await j.admin.reviews();                                                      // every review
 ```
 
-Roles: `judgingAdmin` implies `judge` implies `judgingCode` (any code, including a team's). Codes are
-returned only to admins. Every method's JSDoc names the role it needs.
-
-### Legacy judging (ProductX)
-
-The teams service's original five-metric flow is still exposed as `bt.legacyJudge(email)` and
-`bt.judgingRound`. See `docs/legacyJudge.md`.
+Anything the API does not do (auto-assigning judges, picking finalists) is done in the app and saved
+with `admin.set`. The write is last-write-wins; fine for one organizer at a time.
 
 ## Errors
 
@@ -135,19 +99,19 @@ Every failure is a thrown class. Branch on `instanceof`, never on a status numbe
 
 | Class | When |
 |---|---|
-| `EventNotFoundError`, `TeamNotFoundError`, `UnknownCodeError`, `PhaseClosedError`, `ForbiddenError`, … | A status the action declares. See each method's JSDoc, or `docs/`. |
+| `EventNotFoundError`, `UnknownCodeError`, `ForbiddenError`, `TeamNotFoundError`, `PhaseClosedError`, `SubmissionsClosedError`, `InvalidScoresError`, `InvalidInputError` | A status the action declares. See each method's JSDoc, or `docs/`. |
 | `ApiError` | Any other non-2xx. Has `.status`, `.action`, `.details`. |
-| `NotAuthenticatedError` | Action needs a token and `getToken` returned null. Thrown before any HTTP. |
+| `NotAuthenticatedError` | Action needs a code or token and the getter returned null. Thrown before any HTTP. |
 | `InputError` | Your input failed the declared schema. Thrown before any HTTP. `.details` has the issues. |
 | `ContractViolationError` | The backend returned something the declaration does not describe. Do not catch this; report it. |
 
 ```ts
-import { EventNotFoundError, ApiError } from "@ubc-biztech/sdk";
+import { UnknownCodeError, ApiError } from "@ubc-biztech/sdk";
 
 try {
-  return await bt.event(id, year).get();
+  return await bt.judging(id, year).get();
 } catch (e) {
-  if (e instanceof EventNotFoundError) return notFound();
+  if (e instanceof UnknownCodeError) return badCode();
   if (e instanceof ApiError && e.status >= 500) return retryLater();
   throw e;
 }
@@ -158,8 +122,8 @@ try {
 Every entity and every action's input and output is exported, along with its Zod schema.
 
 ```ts
-import type { Event, Registration, Team, JudgeScores, User } from "@ubc-biztech/sdk";
-import { EventSchema } from "@ubc-biztech/sdk";       // z.ZodType<Event>
+import type { JudgingEvent, JudgingSettings, Rubric, Judge, JudgingTeam, Review, JudgingAdminSetInput } from "@ubc-biztech/sdk";
+import { ReviewSchema } from "@ubc-biztech/sdk";       // z.ZodType<Review>
 ```
 
 ## Migrating an existing app
@@ -178,8 +142,8 @@ if you want to follow one call end to end.
 
 ```
 src/
-  events.ts, users.ts, registrations.ts, teams.ts, judging.ts   the declarations. The only files you edit.
-  roles.ts        who may call what
+  judging.ts      the declaration. The only file you edit (until the next service is added beside it).
+  roles.ts        who may call what, and which credential each role sends
   api.ts          lists every declaration file so the generator can find it
   define.ts       the builders the declarations are written with (entity, resource, action, str, …)
   generate.ts     npm run gen: writes generated/ and docs/

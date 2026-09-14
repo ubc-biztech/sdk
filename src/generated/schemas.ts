@@ -3,354 +3,9 @@ import { z } from "zod";
 
 // ─── Entities ───
 
-/** A BizTech event. Identified by the pair (id, year): the same id recurs across years, e.g. `blueprint` 2024 and 2025. Stored in biztechEvents<stage>. */
-export interface Event {
-  /** URL slug, unique within a year. Lower-case, no spaces. */
-  id: string;
-  /** Calendar year of the event. Together with `id` this is the primary key. */
-  year: number;
-  /** Display name. */
-  ename: string;
-  /** Long-form description shown on the event page. Markdown-ish free text. */
-  description?: string;
-  /** Description shown to partner/company attendees. */
-  partnerDescription?: string;
-  /** Human-readable venue. */
-  elocation?: string;
-  /** ISO-8601 timestamp, UTC. */
-  startDate: string;
-  /** ISO-8601 timestamp, UTC. */
-  endDate: string;
-  /** Registration deadline, ISO-8601 UTC. Registration is closed after this. */
-  deadline?: string;
-  /** Capacity. Registrations beyond this are waitlisted. */
-  capac: number;
-  /** Thumbnail/hero image URL. */
-  imageUrl?: string;
-  /** Visible to members. Unpublished events are only visible to admins. */
-  isPublished: boolean;
-  /** Event has happened; used to move it to the past-events list. */
-  isCompleted?: boolean;
-  /** Registrations are applications that an admin accepts or rejects, rather than first-come. */
-  isApplicationBased?: boolean;
-  /** Non-members may register. */
-  nonBizTechAllowed?: boolean;
-  /** Ticket prices in CAD. */
-  pricing?: {
-    /** Price in CAD for members. 0 or absent means free. */
-    members?: number;
-    /** Price in CAD for non-members. Absent means non-members cannot register. */
-    nonMembers?: number;
-  };
-  /** Custom registration form for attendees. */
-  registrationQuestions?: Array<{
-    /** Stable id; the key used in Registration.dynamicResponses. */
-    questionId: string;
-    /** Question text. */
-    label: string;
-    /** Widget type, e.g. TEXT, SELECT, CHECKBOX, UPLOAD. Not an enum today. */
-    type: string;
-    /** Answer is mandatory. */
-    required: boolean;
-    /** Options for SELECT/CHECKBOX questions. */
-    choices?: string[];
-    /** Max answer length for text questions. */
-    charLimit?: number;
-    /** Optional image shown with the question. */
-    questionImageUrl?: string;
-  }>;
-  /** Same shape as registrationQuestions, for partners. Declared loosely until it is used through the SDK. */
-  partnerRegistrationQuestions?: unknown;
-  /** Legacy feedback-form link. Superseded by attendeeFeedbackQuestions. */
-  feedback?: string;
-  /** Attendee feedback form is open. */
-  attendeeFeedbackEnabled?: boolean;
-  /** Partner feedback form is open. */
-  partnerFeedbackEnabled?: boolean;
-  /** Epoch milliseconds. */
-  createdAt: number;
-  /** Epoch milliseconds. */
-  updatedAt?: number;
-}
-export const EventSchema: z.ZodType<Event> = z.object({
-  id: z.string(),
-  year: z.number().int(),
-  ename: z.string(),
-  description: z.string().optional(),
-  partnerDescription: z.string().optional(),
-  elocation: z.string().optional(),
-  startDate: z.string(),
-  endDate: z.string(),
-  deadline: z.string().optional(),
-  capac: z.number().int(),
-  imageUrl: z.string().optional(),
-  isPublished: z.boolean(),
-  isCompleted: z.boolean().optional(),
-  isApplicationBased: z.boolean().optional(),
-  nonBizTechAllowed: z.boolean().optional(),
-  pricing: z.object({
-    members: z.number().optional(),
-    nonMembers: z.number().optional(),
-  }).optional(),
-  registrationQuestions: z.array(z.object({
-    questionId: z.string(),
-    label: z.string(),
-    type: z.string(),
-    required: z.boolean(),
-    choices: z.array(z.string()).optional(),
-    charLimit: z.number().int().optional(),
-    questionImageUrl: z.string().optional(),
-  })).optional(),
-  partnerRegistrationQuestions: z.unknown().optional(),
-  feedback: z.string().optional(),
-  attendeeFeedbackEnabled: z.boolean().optional(),
-  partnerFeedbackEnabled: z.boolean().optional(),
-  createdAt: z.number().int(),
-  updatedAt: z.number().int().optional(),
-});
-
-/** Registration tallies for one event, as returned by `GET /events/{id}/{year}?count=true`. */
-export interface EventCounts {
-  /** Registrations with status registered. */
-  registeredCount: number;
-  /** Registrations that have checked in. */
-  checkedInCount: number;
-  /** Registrations on the waitlist. */
-  waitlistCount: number;
-  /** Per-question answer tallies, keyed by questionId. Shape varies by question type. */
-  dynamicCounts?: unknown;
-}
-export const EventCountsSchema: z.ZodType<EventCounts> = z.object({
-  registeredCount: z.number().int(),
-  checkedInCount: z.number().int(),
-  waitlistCount: z.number().int(),
-  dynamicCounts: z.unknown().optional(),
-});
-
-/** One user's registration for one event. Keyed by the user's email (`id`) and the composite `eventID;year` string, which is the literal attribute name in DynamoDB. */
-export interface Registration {
-  /** Registrant's email, lower-case. Joins to User.id. */
-  id: string;
-  /** Composite key `<eventId>;<year>`, e.g. `blueprint;2026`. Yes, the semicolon is in the attribute name. */
-  "eventID;year": string;
-  /** First name at registration time. */
-  fname?: string;
-  /** One of registered, checkedIn, waitlist, cancelled, incomplete. Free string on the wire; not enforced server-side. */
-  registrationStatus: string;
-  /** For application-based events: accepted, rejected, reviewing, waitlist. */
-  applicationStatus?: string;
-  /** Registered through the partner/company flow. Judges are partner registrations. */
-  isPartner?: boolean;
-  /** Name, year, faculty, diet, etc. Shape differs for attendee vs partner; declared loosely for now. */
-  basicInformation?: unknown;
-  /** Answers keyed by Event.registrationQuestions[].questionId. */
-  dynamicResponses?: unknown;
-  /** Gamification points earned at the event. */
-  points?: number;
-  /** QR codes this registrant has scanned. */
-  scannedQRs?: string[];
-  /** UBC student number as entered. */
-  studentId?: string;
-  /** Stripe checkout URL while payment is pending. */
-  checkoutLink?: string;
-  /** Epoch milliseconds. */
-  createdAt?: number;
-  /** Epoch milliseconds. */
-  updatedAt?: number;
-}
-export const RegistrationSchema: z.ZodType<Registration> = z.object({
-  id: z.string(),
-  "eventID;year": z.string(),
-  fname: z.string().optional(),
-  registrationStatus: z.string(),
-  applicationStatus: z.string().optional(),
-  isPartner: z.boolean().optional(),
-  basicInformation: z.unknown().optional(),
-  dynamicResponses: z.unknown().optional(),
-  points: z.number().int().optional(),
-  scannedQRs: z.array(z.string()).optional(),
-  studentId: z.string().optional(),
-  checkoutLink: z.string().optional(),
-  createdAt: z.number().int().optional(),
-  updatedAt: z.number().int().optional(),
-});
-
-/** A BizTech account, keyed by email. Created on first sign-in. Membership is a paid annual flag on this record. */
-export interface User {
-  /** Email, lower-case. Primary key. */
-  id: string;
-  /** First name. */
-  fname?: string;
-  /** Last name. */
-  lname?: string;
-  /** UBC student number. */
-  studentId?: string;
-  /** Faculty as entered. */
-  faculty?: string;
-  /** Major as entered. */
-  major?: string;
-  /** Study year as entered, e.g. `3rd Year`. Free text. */
-  year?: string;
-  /** Has an active paid membership. This is the docs' `member` role. */
-  isMember?: boolean;
-  /** Set at creation from the email domain. Not read for authorization anywhere today. */
-  admin?: boolean;
-  /** Array of `eventId;year` strings the user favourited. */
-  favedEventsID?: unknown;
-  /** Epoch milliseconds. */
-  createdAt?: number;
-  /** Epoch milliseconds. */
-  updatedAt?: number;
-}
-export const UserSchema: z.ZodType<User> = z.object({
-  id: z.string(),
-  fname: z.string().optional(),
-  lname: z.string().optional(),
-  studentId: z.string().optional(),
-  faculty: z.string().optional(),
-  major: z.string().optional(),
-  year: z.string().optional(),
-  isMember: z.boolean().optional(),
-  admin: z.boolean().optional(),
-  favedEventsID: z.unknown().optional(),
-  createdAt: z.number().int().optional(),
-  updatedAt: z.number().int().optional(),
-});
-
-/** A team of registrants at one event (hackathons, case comps). Keyed by a UUID and the composite `eventID;year`. Stored in biztechTeams<stage>. */
-export interface Team {
-  /** UUID. */
-  id: string;
-  /** Display name, chosen by the team. */
-  teamName: string;
-  /** Composite key `<eventId>;<year>`. */
-  "eventID;year": string;
-  /** Member emails. Omitted from `teams.list` for non-admin callers. */
-  memberIDs?: string[];
-  /** Member first names, parallel to memberIDs when present. */
-  memberNames?: string[];
-  /** QR codes any member has scanned. */
-  scannedQRs?: string[];
-  /** Points earned. */
-  points?: number;
-  /** Points spent in the event store. */
-  pointsSpent?: number;
-  /** Store transaction ids. */
-  transactions?: string[];
-  /** Items bought. */
-  inventory?: string[];
-  /** Submission link (Devpost, GitHub, …). Empty string when none. */
-  submission?: string;
-  /** Free-form per-event data. */
-  metadata?: unknown;
-  /** BTX funding, if applicable. */
-  funding?: number;
-}
-export const TeamSchema: z.ZodType<Team> = z.object({
-  id: z.string(),
-  teamName: z.string(),
-  "eventID;year": z.string(),
-  memberIDs: z.array(z.string()).optional(),
-  memberNames: z.array(z.string()).optional(),
-  scannedQRs: z.array(z.string()).optional(),
-  points: z.number().int().optional(),
-  pointsSpent: z.number().int().optional(),
-  transactions: z.array(z.string()).optional(),
-  inventory: z.array(z.string()).optional(),
-  submission: z.string().optional(),
-  metadata: z.unknown().optional(),
-  funding: z.number().optional(),
-});
-
-/** A judge's five metric scores for one team in one round. The backend has exactly five numbered metrics; what each means is defined by the event's rubric, not the API. */
-export interface JudgeScores {
-  /** Score for rubric criterion 1. */
-  metric1: number;
-  /** Score for rubric criterion 2. */
-  metric2: number;
-  /** Score for rubric criterion 3. */
-  metric3: number;
-  /** Score for rubric criterion 4. */
-  metric4: number;
-  /** Score for rubric criterion 5. */
-  metric5: number;
-}
-export const JudgeScoresSchema: z.ZodType<JudgeScores> = z.object({
-  metric1: z.number(),
-  metric2: z.number(),
-  metric3: z.number(),
-  metric4: z.number(),
-  metric5: z.number(),
-});
-
-/** One judge's scores and feedback for one team in one round, as returned by the feedback endpoints. */
-export interface JudgeSubmission {
-  /** Judge's email. Judges are partner registrations (`Registration.isPartner`). */
-  judgeID: string;
-  /** Judge display name, if set at submission. */
-  judgeName?: string;
-  /** The five metric scores. */
-  scores?: JudgeScores;
-  /** Written feedback. A string or an object keyed by criterion; both occur. */
-  feedback?: unknown;
-  /** ISO-8601 timestamp of submission. */
-  createdAt?: string;
-  /** Team name at submission time. */
-  teamName?: string;
-}
-export const JudgeSubmissionSchema: z.ZodType<JudgeSubmission> = z.object({
-  judgeID: z.string(),
-  judgeName: z.string().optional(),
-  scores: z.lazy(() => JudgeScoresSchema).optional(),
-  feedback: z.unknown().optional(),
-  createdAt: z.string().optional(),
-  teamName: z.string().optional(),
-});
-
-/** A team's aggregate for the current round, with judge scores z-normalized so a harsh judge and a generous judge count equally. */
-export interface NormalizedTeamScore {
-  /** `<teamId>;<round>` — the composite feedback key, NOT the bare team id. Split on `;` to get the team. */
-  teamID: string;
-  /** Team name. */
-  teamName: string;
-  /** Weighted mean of z-scored metrics across judges. Higher is better. */
-  zScoreWeighted: number;
-  /** Judges who scored this team. */
-  judges: string[];
-  /** Raw per-judge scores before normalization. */
-  originalResponses: Array<{
-    /** Judge email. */
-    judge: string;
-    /** Raw score. */
-    metric1: number;
-    /** Raw score. */
-    metric2: number;
-    /** Raw score. */
-    metric3: number;
-    /** Raw score. */
-    metric4: number;
-    /** Raw score. */
-    metric5: number;
-  }>;
-}
-export const NormalizedTeamScoreSchema: z.ZodType<NormalizedTeamScore> = z.object({
-  teamID: z.string(),
-  teamName: z.string(),
-  zScoreWeighted: z.number(),
-  judges: z.array(z.string()),
-  originalResponses: z.array(z.object({
-    judge: z.string(),
-    metric1: z.number(),
-    metric2: z.number(),
-    metric3: z.number(),
-    metric4: z.number(),
-    metric5: z.number(),
-  })),
-});
-
 /** Everything about one event's judging except the reviews. One backend row, read and replaced whole. */
 export interface JudgingEvent {
-  /** The caller. Present on `get`, absent on `set`. */
+  /** The caller. Present on `get` (with a code); absent on the admin actions. */
   me?: JudgingPrincipal;
   /** ISO-8601, set by the backend on every write. */
   updatedAt: string;
@@ -360,9 +15,9 @@ export interface JudgingEvent {
   rubric: Rubric | null;
   /** Home-page links, in order. */
   links: JudgingLink[];
-  /** Every judge. Codes only for admins. */
+  /** Every judge. Codes only on the admin actions. */
   judges: Judge[];
-  /** Every team. Codes only for admins. */
+  /** Every team. Codes only on the admin actions. */
   teams: JudgingTeam[];
 }
 export const JudgingEventSchema: z.ZodType<JudgingEvent> = z.object({
@@ -395,7 +50,7 @@ export const JudgingInfoSchema: z.ZodType<JudgingInfo> = z.object({
   links: z.array(z.lazy(() => JudgingLinkSchema)),
 });
 
-/** Event phase and switches. Part of JudgingEvent. */
+/** Event phase and switches. Part of JudgingEvent. The backend enforces `phase`, `lockSubmissions`, `maxImages`, `finalsTeamIds`, `finalsJudgeIds`, `showTeamFeedback` and `allowJudgeSeeOthers`; the rest is stored for the portal. */
 export interface JudgingSettings {
   /** Display name, e.g. `HelloHacks 2027`. */
   eventName: string;
@@ -405,7 +60,7 @@ export interface JudgingSettings {
   finalsTeamIds: string[];
   /** Judges who score finals. Empty until finals are set up. */
   finalsJudgeIds: string[];
-  /** Teams may see their own reviews. */
+  /** Teams may read their own reviews. When false, `reviews.list` with a team code is 403. */
   showTeamFeedback: boolean;
   /** Judges may read other judges' reviews. When false, `reviews.list` returns a judge only their own. */
   allowJudgeSeeOthers: boolean;
@@ -413,7 +68,7 @@ export interface JudgingSettings {
   anonymizeTeams: boolean;
   /** Teams may no longer edit their entries, regardless of phase. */
   lockSubmissions: boolean;
-  /** Maximum screenshots per team. */
+  /** Maximum screenshots per team, enforced on `team.update`. */
   maxImages: number;
   /** How many judges the portal's auto-assign gives each team. Stored, not enforced. */
   perTeamJudges?: number;
@@ -444,7 +99,7 @@ export interface Rubric {
   scoreMode: "points" | "weighted";
   /** Criteria in display order. */
   criteria: Array<{
-    /** Stable id; the key in Review.scores. */
+    /** Stable id; the key in Review.scores. Unique within the rubric. */
     id: string;
     /** Short name shown to judges. */
     label: string;
@@ -469,7 +124,7 @@ export const RubricSchema: z.ZodType<Rubric> = z.object({
   })),
 });
 
-/** A team being judged. Not the main app's Team; hackathon teams live inside JudgingEvent. */
+/** A team being judged. Lives inside JudgingEvent; logs in to its own pages with `code`. */
 export interface JudgingTeam {
   /** Assigned by the backend. */
   id: string;
@@ -483,9 +138,9 @@ export interface JudgingTeam {
   github?: string;
   /** Devpost URL. */
   devpost?: string;
-  /** Screenshots, as URLs. */
+  /** Screenshots, as URLs. At most `settings.maxImages`. */
   imageUrls?: string[];
-  /** Login code for the team's own pages. Only returned to admins; minted by the backend when absent. */
+  /** Login code for the team's own pages. Only in `admin.get` and `admin.set` responses; minted by the backend when absent. */
   code?: string;
 }
 export const JudgingTeamSchema: z.ZodType<JudgingTeam> = z.object({
@@ -505,17 +160,14 @@ export interface Judge {
   id: string;
   /** Display name, shown on reviews. */
   name: string;
-  /** This judge's code also grants the organizer role. */
-  isAdmin?: boolean;
-  /** Teams this judge scores in prelims, in order. */
+  /** Teams this judge scores in prelims, in order. Chosen by the portal; not enforced by the backend. */
   assignedTeamIds?: string[];
-  /** Login code. Only returned to admins; minted by the backend when absent. */
+  /** Login code. Only in `admin.get` and `admin.set` responses; minted by the backend when absent. */
   code?: string;
 }
 export const JudgeSchema: z.ZodType<Judge> = z.object({
   id: z.string(),
   name: z.string(),
-  isAdmin: z.boolean().optional(),
   assignedTeamIds: z.array(z.string()).optional(),
   code: z.string().optional(),
 });
@@ -535,17 +187,17 @@ export const JudgingLinkSchema: z.ZodType<JudgingLink> = z.object({
   url: z.string(),
 });
 
-/** Who a code belongs to. Returned as `me` by `judging.get`. */
+/** Who a code belongs to. Returned as `me` by `judging.get`. Organizers are not principals; they are Cognito admins. */
 export interface JudgingPrincipal {
-  /** What the code grants. Admin is an organizer or a judge with `isAdmin`. */
-  role: "admin" | "judge" | "team";
-  /** Judge id or team id. For the stage-wide organizer code, the string `admin`. */
+  /** What the code grants. */
+  role: "judge" | "team";
+  /** Judge id or team id. */
   id: string;
   /** Display name. */
   name: string;
 }
 export const JudgingPrincipalSchema: z.ZodType<JudgingPrincipal> = z.object({
-  role: z.enum(["admin", "judge", "team"]),
+  role: z.enum(["judge", "team"]),
   id: z.string(),
   name: z.string(),
 });
@@ -588,469 +240,6 @@ export const ReviewSchema: z.ZodType<Review> = z.object({
 
 // ─── Action inputs and outputs ───
 
-/** Input for `bt.events.list`. */
-export interface EventsListInput {
-  /** Restrict to events with this id (all years). */
-  id?: string;
-}
-export const EventsListWireSchema = z.object({
-  id: z.string().optional(),
-});
-/** Everything the server receives for `bt.events.list`: scope key, resource key, and input. */
-export type EventsListWire = z.infer<typeof EventsListWireSchema>;
-/** Output of `bt.events.list`. Events, ascending by startDate. */
-export type EventsListOutput = Event[];
-export const EventsListOutputSchema: z.ZodType<EventsListOutput> = z.array(z.lazy(() => EventSchema));
-
-export const EventGetWireSchema = z.object({
-  id: z.string(),
-  year: z.number().int(),
-});
-/** Everything the server receives for `bt.event(id, year).get`: scope key, resource key, and input. */
-export type EventGetWire = z.infer<typeof EventGetWireSchema>;
-/** Output of `bt.event(id, year).get`. The event. */
-export type EventGetOutput = Event;
-export const EventGetOutputSchema: z.ZodType<EventGetOutput> = z.lazy(() => EventSchema);
-
-export const EventCountsWireSchema = z.object({
-  id: z.string(),
-  year: z.number().int(),
-});
-/** Everything the server receives for `bt.event(id, year).counts`: scope key, resource key, and input. */
-export type EventCountsWire = z.infer<typeof EventCountsWireSchema>;
-/** Output of `bt.event(id, year).counts`. The tallies. */
-export type EventCountsOutput = EventCounts;
-export const EventCountsOutputSchema: z.ZodType<EventCountsOutput> = z.lazy(() => EventCountsSchema);
-
-/** Input for `bt.registrations.list`. */
-export interface RegistrationsListInput {
-  /** Registrant email. Case-insensitive. */
-  email?: string;
-  /** Event id (slug). Must be paired with `year`. */
-  eventID?: string;
-  /** Event year. Must be paired with `eventID`. */
-  year?: number;
-}
-export const RegistrationsListWireSchema = z.object({
-  email: z.string().optional(),
-  eventID: z.string().optional(),
-  year: z.number().int().optional(),
-});
-/** Everything the server receives for `bt.registrations.list`: scope key, resource key, and input. */
-export type RegistrationsListWire = z.infer<typeof RegistrationsListWireSchema>;
-/** Output of `bt.registrations.list`. Matching registrations. Empty array when none. */
-export type RegistrationsListOutput = Registration[];
-export const RegistrationsListOutputSchema: z.ZodType<RegistrationsListOutput> = z.array(z.lazy(() => RegistrationSchema));
-
-export const MeGetWireSchema = z.object({
-});
-/** Everything the server receives for `bt.me.get`: scope key, resource key, and input. */
-export type MeGetWire = z.infer<typeof MeGetWireSchema>;
-/** Output of `bt.me.get`. The caller. */
-export type MeGetOutput = User;
-export const MeGetOutputSchema: z.ZodType<MeGetOutput> = z.lazy(() => UserSchema);
-
-export const UserGetWireSchema = z.object({
-  email: z.string(),
-});
-/** Everything the server receives for `bt.user(email).get`: scope key, resource key, and input. */
-export type UserGetWire = z.infer<typeof UserGetWireSchema>;
-/** Output of `bt.user(email).get`. The user. */
-export type UserGetOutput = User;
-export const UserGetOutputSchema: z.ZodType<UserGetOutput> = z.lazy(() => UserSchema);
-
-/** Input for `bt.teams.list`. */
-export interface TeamsListInput {
-  /** Event id (slug). */
-  eventID: string;
-  /** Event year. */
-  year: number;
-}
-export const TeamsListWireSchema = z.object({
-  eventID: z.string(),
-  year: z.number().int(),
-});
-/** Everything the server receives for `bt.teams.list`: scope key, resource key, and input. */
-export type TeamsListWire = z.infer<typeof TeamsListWireSchema>;
-/** Output of `bt.teams.list`. Teams for the event. */
-export type TeamsListOutput = Team[];
-export const TeamsListOutputSchema: z.ZodType<TeamsListOutput> = z.array(z.lazy(() => TeamSchema));
-
-export const TeamsScoresWireSchema = z.object({
-});
-/** Everything the server receives for `bt.teams.scores`: scope key, resource key, and input. */
-export type TeamsScoresWire = z.infer<typeof TeamsScoresWireSchema>;
-/** Output of `bt.teams.scores`. Aggregates, unordered. */
-export type TeamsScoresOutput = NormalizedTeamScore[];
-export const TeamsScoresOutputSchema: z.ZodType<TeamsScoresOutput> = z.array(z.lazy(() => NormalizedTeamScoreSchema));
-
-/** Input for `bt.teams.forUser`. */
-export interface TeamsForUserInput {
-  /** Member email. */
-  user_id: string;
-  /** Event id (slug). */
-  eventID: string;
-  /** Event year. */
-  year: number;
-}
-export const TeamsForUserWireSchema = z.object({
-  user_id: z.string(),
-  eventID: z.string(),
-  year: z.number().int(),
-});
-/** Everything the server receives for `bt.teams.forUser`: scope key, resource key, and input. */
-export type TeamsForUserWire = z.infer<typeof TeamsForUserWireSchema>;
-/** Output of `bt.teams.forUser`. Wrapper around the team. */
-export type TeamsForUserOutput = {
-  /** Confirmation. */
-  message: string;
-  /** The team. */
-  response: Team;
-};
-export const TeamsForUserOutputSchema: z.ZodType<TeamsForUserOutput> = z.object({
-  message: z.string(),
-  response: z.lazy(() => TeamSchema),
-});
-
-/** Input for `bt.teams.create`. */
-export interface TeamsCreateInput {
-  /** Team name. */
-  team_name: string;
-  /** Event id (slug). */
-  eventID: string;
-  /** Event year. */
-  year: number;
-  /** Initial members' emails. */
-  memberIDs: string[];
-}
-export const TeamsCreateWireSchema = z.object({
-  team_name: z.string(),
-  eventID: z.string(),
-  year: z.number().int(),
-  memberIDs: z.array(z.string()),
-});
-/** Everything the server receives for `bt.teams.create`: scope key, resource key, and input. */
-export type TeamsCreateWire = z.infer<typeof TeamsCreateWireSchema>;
-/** Output of `bt.teams.create`. Wrapper around the created team. */
-export type TeamsCreateOutput = {
-  /** Confirmation. */
-  message: string;
-  /** The new team. */
-  response: Team;
-};
-export const TeamsCreateOutputSchema: z.ZodType<TeamsCreateOutput> = z.object({
-  message: z.string(),
-  response: z.lazy(() => TeamSchema),
-});
-
-/** Input for `bt.teams.join`. */
-export interface TeamsJoinInput {
-  /** Joining member's email. */
-  memberID: string;
-  /** Event id (slug). */
-  eventID: string;
-  /** Event year. */
-  year: number;
-  /** Team UUID to join. */
-  teamID: string;
-}
-export const TeamsJoinWireSchema = z.object({
-  memberID: z.string(),
-  eventID: z.string(),
-  year: z.number().int(),
-  teamID: z.string(),
-});
-/** Everything the server receives for `bt.teams.join`: scope key, resource key, and input. */
-export type TeamsJoinWire = z.infer<typeof TeamsJoinWireSchema>;
-/** Output of `bt.teams.join`. Confirmation; `response` echoes the input. */
-export type TeamsJoinOutput = {
-  /** Human-readable confirmation. */
-  message: string;
-};
-export const TeamsJoinOutputSchema: z.ZodType<TeamsJoinOutput> = z.object({
-  message: z.string(),
-});
-
-/** Input for `bt.teams.leave`. */
-export interface TeamsLeaveInput {
-  /** Leaving member's email. */
-  memberID: string;
-  /** Event id (slug). */
-  eventID: string;
-  /** Event year. */
-  year: number;
-}
-export const TeamsLeaveWireSchema = z.object({
-  memberID: z.string(),
-  eventID: z.string(),
-  year: z.number().int(),
-});
-/** Everything the server receives for `bt.teams.leave`: scope key, resource key, and input. */
-export type TeamsLeaveWire = z.infer<typeof TeamsLeaveWireSchema>;
-/** Output of `bt.teams.leave`. Confirmation; `response` echoes the input. */
-export type TeamsLeaveOutput = {
-  /** Human-readable confirmation. */
-  message: string;
-};
-export const TeamsLeaveOutputSchema: z.ZodType<TeamsLeaveOutput> = z.object({
-  message: z.string(),
-});
-
-/** Input for `bt.teams.rename`. */
-export interface TeamsRenameInput {
-  /** A member's email. */
-  user_id: string;
-  /** Event id (slug). */
-  eventID: string;
-  /** Event year. */
-  year: number;
-  /** New name. */
-  team_name: string;
-}
-export const TeamsRenameWireSchema = z.object({
-  user_id: z.string(),
-  eventID: z.string(),
-  year: z.number().int(),
-  team_name: z.string(),
-});
-/** Everything the server receives for `bt.teams.rename`: scope key, resource key, and input. */
-export type TeamsRenameWire = z.infer<typeof TeamsRenameWireSchema>;
-/** Output of `bt.teams.rename`. Confirmation. */
-export type TeamsRenameOutput = {
-  /** Human-readable confirmation. */
-  message: string;
-};
-export const TeamsRenameOutputSchema: z.ZodType<TeamsRenameOutput> = z.object({
-  message: z.string(),
-});
-
-/** Input for `bt.teams.addPoints`. */
-export interface TeamsAddPointsInput {
-  /** A member's email. */
-  user_id: string;
-  /** Event id (slug). */
-  eventID: string;
-  /** Event year. */
-  year: number;
-  /** Delta. Negative subtracts. */
-  change_points: number;
-}
-export const TeamsAddPointsWireSchema = z.object({
-  user_id: z.string(),
-  eventID: z.string(),
-  year: z.number().int(),
-  change_points: z.number().int(),
-});
-/** Everything the server receives for `bt.teams.addPoints`: scope key, resource key, and input. */
-export type TeamsAddPointsWire = z.infer<typeof TeamsAddPointsWireSchema>;
-/** Output of `bt.teams.addPoints`. New total. */
-export type TeamsAddPointsOutput = {
-  /** Confirmation. */
-  message: string;
-  /** Team's new total. */
-  updatedPoints: number;
-};
-export const TeamsAddPointsOutputSchema: z.ZodType<TeamsAddPointsOutput> = z.object({
-  message: z.string(),
-  updatedPoints: z.number().int(),
-});
-
-export const TeamFeedbackWireSchema = z.object({
-  id: z.string(),
-});
-/** Everything the server receives for `bt.team(id).feedback`: scope key, resource key, and input. */
-export type TeamFeedbackWire = z.infer<typeof TeamFeedbackWireSchema>;
-/** Output of `bt.team(id).feedback`. Submissions by round. */
-export type TeamFeedbackOutput = {
-  /** Confirmation. */
-  message: string;
-  /** Keyed by round, e.g. `"1"`. */
-  scores: Record<string, JudgeSubmission[]>;
-};
-export const TeamFeedbackOutputSchema: z.ZodType<TeamFeedbackOutput> = z.object({
-  message: z.string(),
-  scores: z.record(z.string(), z.array(z.lazy(() => JudgeSubmissionSchema))),
-});
-
-/** Input for `bt.team(id).assignJudges`. */
-export interface TeamAssignJudgesInput {
-  /** Judges to assign. */
-  judgeIDs: string[];
-}
-export const TeamAssignJudgesWireSchema = z.object({
-  id: z.string(),
-  judgeIDs: z.array(z.string()),
-});
-/** Everything the server receives for `bt.team(id).assignJudges`: scope key, resource key, and input. */
-export type TeamAssignJudgesWire = z.infer<typeof TeamAssignJudgesWireSchema>;
-/** Output of `bt.team(id).assignJudges`. Confirmation. */
-export type TeamAssignJudgesOutput = {
-  /** Human-readable confirmation. */
-  message: string;
-};
-export const TeamAssignJudgesOutputSchema: z.ZodType<TeamAssignJudgesOutput> = z.object({
-  message: z.string(),
-});
-
-export const LegacyJudgeCurrentTeamWireSchema = z.object({
-  judgeID: z.string(),
-});
-/** Everything the server receives for `bt.legacyJudge(judgeID).currentTeam`: scope key, resource key, and input. */
-export type LegacyJudgeCurrentTeamWire = z.infer<typeof LegacyJudgeCurrentTeamWireSchema>;
-/** Output of `bt.legacyJudge(judgeID).currentTeam`. Current assignment. */
-export type LegacyJudgeCurrentTeamOutput = {
-  /** Confirmation. */
-  message: string;
-  /** Assigned team UUID. */
-  currentTeamID: string;
-  /** Team name, or null if the team record is missing. */
-  currentTeamName: string | null;
-};
-export const LegacyJudgeCurrentTeamOutputSchema: z.ZodType<LegacyJudgeCurrentTeamOutput> = z.object({
-  message: z.string(),
-  currentTeamID: z.string(),
-  currentTeamName: z.string().nullable(),
-});
-
-export const LegacyJudgeSubmissionsWireSchema = z.object({
-  judgeID: z.string(),
-});
-/** Everything the server receives for `bt.legacyJudge(judgeID).submissions`: scope key, resource key, and input. */
-export type LegacyJudgeSubmissionsWire = z.infer<typeof LegacyJudgeSubmissionsWireSchema>;
-/** Output of `bt.legacyJudge(judgeID).submissions`. Submissions by round. */
-export type LegacyJudgeSubmissionsOutput = {
-  /** Confirmation. */
-  message: string;
-  /** Keyed by round. */
-  scores: Record<string, Array<{
-    /** Round number as a string. */
-    round: string;
-    /** Judge email. */
-    judgeID: string;
-    /** Judge display name. */
-    judgeName?: string;
-    /** The five metrics. */
-    scores?: JudgeScores;
-    /** Written feedback; string or object. */
-    feedback?: unknown;
-    /** Team UUID. */
-    teamID: string;
-    /** Team name at submission. */
-    teamName?: string;
-    /** ISO-8601. */
-    createdAt?: string;
-  }>>;
-};
-export const LegacyJudgeSubmissionsOutputSchema: z.ZodType<LegacyJudgeSubmissionsOutput> = z.object({
-  message: z.string(),
-  scores: z.record(z.string(), z.array(z.object({
-    round: z.string(),
-    judgeID: z.string(),
-    judgeName: z.string().optional(),
-    scores: z.lazy(() => JudgeScoresSchema).optional(),
-    feedback: z.unknown().optional(),
-    teamID: z.string(),
-    teamName: z.string().optional(),
-    createdAt: z.string().optional(),
-  }))),
-});
-
-/** Input for `bt.legacyJudge(judgeID).submit`. */
-export interface LegacyJudgeSubmitInput {
-  /** Team UUID. */
-  teamID: string;
-  /** Event id (slug). */
-  eventID: string;
-  /** Event year. */
-  year: number;
-  /** Five metric scores, all non-zero. */
-  scores: JudgeScores;
-  /** Written feedback; string or object keyed by criterion. */
-  feedback?: unknown;
-}
-export const LegacyJudgeSubmitWireSchema = z.object({
-  judgeID: z.string(),
-  teamID: z.string(),
-  eventID: z.string(),
-  year: z.number().int(),
-  scores: z.lazy(() => JudgeScoresSchema),
-  feedback: z.unknown().optional(),
-});
-/** Everything the server receives for `bt.legacyJudge(judgeID).submit`: scope key, resource key, and input. */
-export type LegacyJudgeSubmitWire = z.infer<typeof LegacyJudgeSubmitWireSchema>;
-/** Output of `bt.legacyJudge(judgeID).submit`. Confirmation. */
-export type LegacyJudgeSubmitOutput = {
-  /** Human-readable confirmation. */
-  message: string;
-};
-export const LegacyJudgeSubmitOutputSchema: z.ZodType<LegacyJudgeSubmitOutput> = z.object({
-  message: z.string(),
-});
-
-/** Input for `bt.legacyJudge(judgeID).updateSubmission`. */
-export interface LegacyJudgeUpdateSubmissionInput {
-  /** Team UUID. */
-  teamID: string;
-  /** Round the submission was made in. */
-  round: string;
-  /** Replacement scores. */
-  scores?: JudgeScores;
-  /** Replacement feedback. */
-  feedback?: unknown;
-  /** Replacement judge display name. */
-  judgeName?: string;
-}
-export const LegacyJudgeUpdateSubmissionWireSchema = z.object({
-  judgeID: z.string(),
-  teamID: z.string(),
-  round: z.string(),
-  scores: z.lazy(() => JudgeScoresSchema).optional(),
-  feedback: z.unknown().optional(),
-  judgeName: z.string().optional(),
-});
-/** Everything the server receives for `bt.legacyJudge(judgeID).updateSubmission`: scope key, resource key, and input. */
-export type LegacyJudgeUpdateSubmissionWire = z.infer<typeof LegacyJudgeUpdateSubmissionWireSchema>;
-/** Output of `bt.legacyJudge(judgeID).updateSubmission`. Confirmation. */
-export type LegacyJudgeUpdateSubmissionOutput = {
-  /** Human-readable confirmation. */
-  message: string;
-};
-export const LegacyJudgeUpdateSubmissionOutputSchema: z.ZodType<LegacyJudgeUpdateSubmissionOutput> = z.object({
-  message: z.string(),
-});
-
-export const JudgingRoundGetWireSchema = z.object({
-});
-/** Everything the server receives for `bt.judgingRound.get`: scope key, resource key, and input. */
-export type JudgingRoundGetWire = z.infer<typeof JudgingRoundGetWireSchema>;
-/** Output of `bt.judgingRound.get`. Current round. */
-export type JudgingRoundGetOutput = {
-  /** Round identifier, e.g. `"1"`. A string on the wire. */
-  round: string;
-};
-export const JudgingRoundGetOutputSchema: z.ZodType<JudgingRoundGetOutput> = z.object({
-  round: z.string(),
-});
-
-/** Input for `bt.judgingRound.set`. */
-export interface JudgingRoundSetInput {
-  /** New round identifier. */
-  round: string;
-}
-export const JudgingRoundSetWireSchema = z.object({
-  round: z.string(),
-});
-/** Everything the server receives for `bt.judgingRound.set`: scope key, resource key, and input. */
-export type JudgingRoundSetWire = z.infer<typeof JudgingRoundSetWireSchema>;
-/** Output of `bt.judgingRound.set`. Confirmation. */
-export type JudgingRoundSetOutput = {
-  /** Human-readable confirmation. */
-  message: string;
-};
-export const JudgingRoundSetOutputSchema: z.ZodType<JudgingRoundSetOutput> = z.object({
-  message: z.string(),
-});
-
 export const JudgingInfoWireSchema = z.object({
   eventID: z.string(),
   year: z.number().int(),
@@ -1071,8 +260,18 @@ export type JudgingGetWire = z.infer<typeof JudgingGetWireSchema>;
 export type JudgingGetOutput = JudgingEvent;
 export const JudgingGetOutputSchema: z.ZodType<JudgingGetOutput> = z.lazy(() => JudgingEventSchema);
 
-/** Input for `bt.judging(eventID, year).set`. */
-export interface JudgingSetInput {
+export const JudgingAdminGetWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).admin.get`: scope key, resource key, and input. */
+export type JudgingAdminGetWire = z.infer<typeof JudgingAdminGetWireSchema>;
+/** Output of `bt.judging(eventID, year).admin.get`. The document with every code. */
+export type JudgingAdminGetOutput = JudgingEvent;
+export const JudgingAdminGetOutputSchema: z.ZodType<JudgingAdminGetOutput> = z.lazy(() => JudgingEventSchema);
+
+/** Input for `bt.judging(eventID, year).admin.set`. */
+export interface JudgingAdminSetInput {
   /** Phase and switches. */
   settings: JudgingSettings;
   /** The rubric. Omit or null for none. */
@@ -1085,11 +284,9 @@ export interface JudgingSetInput {
     id?: string;
     /** Display name, shown on reviews. */
     name: string;
-    /** This judge's code also grants the organizer role. */
-    isAdmin?: boolean;
-    /** Teams this judge scores in prelims, in order. */
+    /** Teams this judge scores in prelims, in order. Chosen by the portal; not enforced by the backend. */
     assignedTeamIds?: string[];
-    /** Login code. Only returned to admins; minted by the backend when absent. */
+    /** Keep an existing judge's code; omit to mint one. */
     code?: string;
   }>;
   /** Every team. */
@@ -1106,13 +303,13 @@ export interface JudgingSetInput {
     github?: string;
     /** Devpost URL. */
     devpost?: string;
-    /** Screenshots, as URLs. */
+    /** Screenshots, as URLs. At most `settings.maxImages`. */
     imageUrls?: string[];
     /** Keep an existing team's code; omit to mint one. */
     code?: string;
   }>;
 }
-export const JudgingSetWireSchema = z.object({
+export const JudgingAdminSetWireSchema = z.object({
   eventID: z.string(),
   year: z.number().int(),
   settings: z.lazy(() => JudgingSettingsSchema),
@@ -1121,7 +318,6 @@ export const JudgingSetWireSchema = z.object({
   judges: z.array(z.object({
     id: z.string().optional(),
     name: z.string(),
-    isAdmin: z.boolean().optional(),
     assignedTeamIds: z.array(z.string()).optional(),
     code: z.string().optional(),
   })),
@@ -1136,11 +332,33 @@ export const JudgingSetWireSchema = z.object({
     code: z.string().optional(),
   })),
 });
-/** Everything the server receives for `bt.judging(eventID, year).set`: scope key, resource key, and input. */
-export type JudgingSetWire = z.infer<typeof JudgingSetWireSchema>;
-/** Output of `bt.judging(eventID, year).set`. The stored document with every code. */
-export type JudgingSetOutput = JudgingEvent;
-export const JudgingSetOutputSchema: z.ZodType<JudgingSetOutput> = z.lazy(() => JudgingEventSchema);
+/** Everything the server receives for `bt.judging(eventID, year).admin.set`: scope key, resource key, and input. */
+export type JudgingAdminSetWire = z.infer<typeof JudgingAdminSetWireSchema>;
+/** Output of `bt.judging(eventID, year).admin.set`. The stored document with every code. */
+export type JudgingAdminSetOutput = JudgingEvent;
+export const JudgingAdminSetOutputSchema: z.ZodType<JudgingAdminSetOutput> = z.lazy(() => JudgingEventSchema);
+
+/** Input for `bt.judging(eventID, year).admin.reviews`. */
+export interface JudgingAdminReviewsInput {
+  /** Restrict to a round. */
+  round?: "prelim" | "finals";
+  /** Restrict to a team. */
+  teamId?: string;
+  /** Restrict to a judge. */
+  judgeId?: string;
+}
+export const JudgingAdminReviewsWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  round: z.enum(["prelim", "finals"]).optional(),
+  teamId: z.string().optional(),
+  judgeId: z.string().optional(),
+});
+/** Everything the server receives for `bt.judging(eventID, year).admin.reviews`: scope key, resource key, and input. */
+export type JudgingAdminReviewsWire = z.infer<typeof JudgingAdminReviewsWireSchema>;
+/** Output of `bt.judging(eventID, year).admin.reviews`. Matching reviews, newest first. */
+export type JudgingAdminReviewsOutput = Review[];
+export const JudgingAdminReviewsOutputSchema: z.ZodType<JudgingAdminReviewsOutput> = z.array(z.lazy(() => ReviewSchema));
 
 /** Input for `bt.judging(eventID, year).team(id).update`. */
 export interface JudgingTeamUpdateInput {
@@ -1154,7 +372,7 @@ export interface JudgingTeamUpdateInput {
   github?: string;
   /** Devpost URL. */
   devpost?: string;
-  /** Screenshots, as URLs. */
+  /** Screenshots, as URLs. At most `settings.maxImages`. */
   imageUrls?: string[];
 }
 export const JudgingTeamUpdateWireSchema = z.object({

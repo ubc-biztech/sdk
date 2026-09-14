@@ -142,7 +142,7 @@ function emitClient(o: Api): string {
     const r = a.spec.route;
     const errors = Object.entries(a.spec.errors).map(([en, e]) => `${e.status}: E.${en}Error`).join(", ");
     out += `  "${a.key}": {\n    key: "${a.key}", method: "${r.method}", path: ${JSON.stringify(r.path)}, query: ${JSON.stringify(r.query ?? [])}, fixedQuery: ${JSON.stringify(r.fixedQuery ?? {})},\n`;
-    out += `    auth: "${a.spec.auth}", input: S.${typeName(a)}WireSchema, output: S.${typeName(a)}OutputSchema, errors: { ${errors} },\n  },\n`;
+    out += `    auth: "${a.spec.auth}", credential: "${o.roles[a.spec.auth]!.credential}", input: S.${typeName(a)}WireSchema, output: S.${typeName(a)}OutputSchema, errors: { ${errors} },\n  },\n`;
   }
   out += `} satisfies Record<string, ActionMeta>;\n\n`;
 

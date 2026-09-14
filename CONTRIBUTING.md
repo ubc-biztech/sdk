@@ -81,7 +81,8 @@ action({ description, auth, input?, output, errors?, route: { method, path, quer
 ```
 
 Field builders: `str int num bool json oneOf(values) list(items) obj(fields) record(values) ref(Entity)`,
-each taking `{ description, optional?, nullable? }`. `auth` is one of the keys in `src/roles.ts`.
+each taking `{ description, optional?, nullable? }`. `auth` is one of the keys in `src/roles.ts`; each role
+says which credential the runtime sends (`none`, the `X-Judging-Code` header, or the Cognito bearer token).
 Fields named `{like_this}` in `route.path` come from the key or input; `route.query` names query params;
 the rest is the JSON body.
 
@@ -89,5 +90,6 @@ the rest is the JSON body.
 
 - `route.path` is the literal path from `serverless.yml`. Never invent one. Never add a trailing slash.
 - Do not add a role to `roles.ts` because an action needs it. Roles are decided in roles.ts, on purpose, not per endpoint.
+  A role's `credential` is what the runtime sends; a code role and a token role never satisfy each other.
 - The generator (`src/generate.ts`) is template strings and must stay readable in one sitting. A test fails if
   it passes 500 lines. If a change needs a new abstraction there, stop and ask.

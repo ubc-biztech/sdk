@@ -3,57 +3,42 @@ import { BtError } from "../runtime.js";
 
 export { BtError, ApiError, NotAuthenticatedError, InputError, ContractViolationError } from "../runtime.js";
 
-/** No event with that id and year. */
+/** No judging has been set up for this event. `admin.set` creates it. */
 export class EventNotFoundError extends BtError {
   override readonly name = "EventNotFoundError";
 }
 
-/** Neither email nor eventID+year was given. */
-export class MissingFilterError extends BtError {
-  override readonly name = "MissingFilterError";
-}
-
-/** No user record for the caller's email yet. */
-export class UserNotFoundError extends BtError {
-  override readonly name = "UserNotFoundError";
-}
-
-/** User is not on a team for this event. */
-export class TeamNotFoundError extends BtError {
-  override readonly name = "TeamNotFoundError";
-}
-
-/** Every listed judge has already scored this team this round. */
-export class AllJudgesDoneError extends BtError {
-  override readonly name = "AllJudgesDoneError";
-}
-
-/** A metric is missing or zero. */
-export class InvalidScoresError extends BtError {
-  override readonly name = "InvalidScoresError";
-}
-
-/** No partner registration for this judge at this event, or already submitted for this team this round. */
-export class NotAJudgeError extends BtError {
-  override readonly name = "NotAJudgeError";
-}
-
-/** No judge, team or organizer code matches. */
+/** The code matches no judge or team of this event (or no judging exists for it yet). */
 export class UnknownCodeError extends BtError {
   override readonly name = "UnknownCodeError";
 }
 
-/** A team code tried to edit a different team. */
+/** The token is valid but its account is not a BizTech admin. */
 export class ForbiddenError extends BtError {
   override readonly name = "ForbiddenError";
 }
 
-/** Phase is past `submission`, or `lockSubmissions` is on, or too many images. */
+/** A required field is missing, the phase is not one of the four, or two rubric criteria share an id. */
+export class InvalidInputError extends BtError {
+  override readonly name = "InvalidInputError";
+}
+
+/** No such team. */
+export class TeamNotFoundError extends BtError {
+  override readonly name = "TeamNotFoundError";
+}
+
+/** Phase is past `submission`, `lockSubmissions` is on, or there are more than `maxImages` images. */
 export class SubmissionsClosedError extends BtError {
   override readonly name = "SubmissionsClosedError";
 }
 
-/** Judging is not open, or this judge or team is not in the finals. */
+/** A criterion is missing, extra, or out of range. */
+export class InvalidScoresError extends BtError {
+  override readonly name = "InvalidScoresError";
+}
+
+/** Judging is not open, there is no rubric, or this judge or team is not in the finals. */
 export class PhaseClosedError extends BtError {
   override readonly name = "PhaseClosedError";
 }

@@ -13,7 +13,7 @@ describe("api declaration", () => {
 
   it("rejects an undeclared role, a path param that is not an input, a shadowed key, and an empty description", () => {
     const bad: Api = {
-      roles: { public: { description: "x" } },
+      roles: { public: { credential: "none", description: "x" } },
       entities: {},
       resources: {
         thing: {

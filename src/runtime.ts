@@ -23,11 +23,11 @@ export class ApiError extends BtError {
   }
 }
 
-/** The action requires a token and `getToken` returned none. */
+/** The action needs a credential (`getCode` or `getToken`) and none was available. Nothing was sent. */
 export class NotAuthenticatedError extends BtError {
   override readonly name = "NotAuthenticatedError";
-  constructor(readonly action: string, readonly auth: string) {
-    super(`${action} requires auth "${auth}" but no token is available`);
+  constructor(readonly action: string, readonly auth: string, readonly credential: "code" | "token") {
+    super(`${action} requires auth "${auth}" but ClientConfig.${credential === "code" ? "getCode" : "getToken"} returned nothing`);
   }
 }
 
@@ -55,7 +55,15 @@ export class ContractViolationError extends BtError {
 export type ClientConfig = {
   /** e.g. https://api-dev.ubcbiztech.com — no trailing slash. */
   baseUrl: string;
-  /** Returns the Cognito ID token, or null when signed out. Required for non-public actions. */
+  /**
+   * The signed-in judge's or team's code, or null when nobody is signed in with one. Sent as
+   * `X-Judging-Code` on every action whose role's credential is `code`.
+   */
+  getCode?: () => Promise<string | null | undefined> | string | null | undefined;
+  /**
+   * The organizer's Cognito ID token, or null when signed out. Sent as `Authorization: Bearer`
+   * on every action whose role's credential is `token`.
+   */
   getToken?: () => Promise<string | null | undefined> | string | null | undefined;
   /** Override for tests or non-browser runtimes. Defaults to global fetch. */
   fetch?: typeof fetch;
@@ -77,6 +85,8 @@ export type ActionMeta = {
   query: readonly string[];
   fixedQuery: Record<string, string>;
   auth: string;
+  /** What `auth` sends: nothing, the judging code header, or the Cognito bearer token. */
+  credential: "none" | "code" | "token";
   input?: ZodType;
   output: ZodType;
   /** HTTP status → semantic error class. */
@@ -128,11 +138,17 @@ export class Runtime {
       }
     }
 
-    // 4. Auth. Public actions still send a token if one exists, because some handlers
-    //    (e.g. events.list for admins) return more with one.
-    const token = this.config.getToken ? await this.config.getToken() : null;
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    else if (meta.auth !== "public") throw new NotAuthenticatedError(meta.key, meta.auth);
+    // 4. Credential. Public actions send nothing: the backend answers a wrong code with 401
+    //    even on public routes, so a stale code must not leak onto them.
+    if (meta.credential === "code") {
+      const code = this.config.getCode ? await this.config.getCode() : null;
+      if (!code) throw new NotAuthenticatedError(meta.key, meta.auth, "code");
+      headers["X-Judging-Code"] = code;
+    } else if (meta.credential === "token") {
+      const token = this.config.getToken ? await this.config.getToken() : null;
+      if (!token) throw new NotAuthenticatedError(meta.key, meta.auth, "token");
+      headers["Authorization"] = `Bearer ${token}`;
+    }
 
     // 5. Call, and map the status to a declared error or ApiError.
     const res = await this.fetchImpl(url, { method: meta.method, headers, body });

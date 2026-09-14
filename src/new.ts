@@ -26,7 +26,7 @@ const collection = plural
   ? `  collection: {
     list: action({
       description: "TODO: what does this return? Say anything surprising (sorting, filtering, who sees what).",
-      auth: "public",   // one of: public, authenticated, member, admin  (src/roles.ts)
+      auth: "public",   // one of: public, judgingCode, judge, admin  (src/roles.ts)
       output: list(ref(${Entity}, { description: "One ${singular}." }), { description: "TODO" }),
       route: { method: "GET", path: "/TODO" },   // exact path from the service's serverless.yml, leading slash, no trailing slash
     }),

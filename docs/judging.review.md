@@ -1,12 +1,12 @@
 # `judging.review`
 
-Scores. `bt.judging(e, y).reviews.list()`; a judge submits with `team(id).review(…)`.
+Scores, as a judge or team may see them. `bt.judging(e, y).reviews.list()`; organizers use `admin.reviews()`.
 
-Scoped under `bt.judging(eventID, year)`: One event's judging. Keyed like Event: (eventID, year).
+Scoped under `bt.judging(eventID, year)`: One event's judging. Keyed like an event: (eventID, year).
 
 ## `bt.judging(eventID, year).reviews.list(input)`
 
-Reviews, newest first, with optional filters. Admins see everything. Judges see everything when `allowJudgeSeeOthers`, else only their own. A team code sees only its own team's, and only when `showTeamFeedback`.
+Reviews, newest first, with optional filters. A judge sees everything when `allowJudgeSeeOthers`, else only their own. A team sees only its own, and only when `showTeamFeedback`.
 
 - **Auth:** `judgingCode`
 - **Route:** `GET /judging/{eventID}/{year}/reviews`
@@ -25,5 +25,6 @@ Reviews, newest first, with optional filters. Admins see everything. Judges see 
 
 | Error | HTTP | When |
 |---|---|---|
-| `ForbiddenError` | 403 | A team code asked before results are public. |
+| `UnknownCodeError` | 401 | The code matches no judge or team of this event (or no judging exists for it yet). |
+| `ForbiddenError` | 403 | A team code asked before `showTeamFeedback` is on. |
 

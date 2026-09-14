@@ -1,8 +1,4 @@
 {
   "_comment": "Rows on api-dev that are known to violate the declaration. The contract test fails on any violation NOT listed here. Delete the row, then delete the entry. Never add an entry without a reason and a date.",
-  "events.list": [
-    { "id": "__INTEGRATION_TEST_EVENT", "year": 2020, "reason": "Integration-test fixture missing ename/startDate/endDate/isPublished. Phase 0 cleanup.", "since": "2026-09-10" },
-    { "id": "__INTEGRATION_TEST_EVENT_POST", "year": 2020, "reason": "Integration-test fixture missing startDate/endDate/isPublished. Phase 0 cleanup.", "since": "2026-09-10" },
-    { "id": "form-key-test", "year": 2026, "reason": "Manual test row missing ename/startDate/endDate/isPublished. Phase 0 cleanup.", "since": "2026-09-10" }
-  ]
+  "judging.info": []
 }
