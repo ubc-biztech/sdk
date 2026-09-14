@@ -25,7 +25,7 @@ jobs:
         run: |
           git show ${{ github.event.pull_request.base.sha }}:src/generated/api.json > /tmp/base-api.json
           git show ${{ github.event.pull_request.base.sha }}:package.json > /tmp/base-package.json
-          npx tsx src/semver.ts /tmp/base-api.json --enforce /tmp/base-package.json
+          npx tsx scripts/semver.ts /tmp/base-api.json --enforce /tmp/base-package.json
 
   # Proves the declaration against api-dev. Read-only, public actions only.
   contract:

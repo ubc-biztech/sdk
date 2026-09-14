@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { classify } from "../src/semver.js";
-import { api } from "../src/api.js";
-import type { Api } from "../src/define.js";
+import { classify } from "../scripts/semver.js";
+import { api } from "../src/resources/index.js";
+import type { Api } from "../src/core/define.js";
 
 const clone = (): Api => JSON.parse(JSON.stringify(api));
 

@@ -5,29 +5,29 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { api } from "../src/api.js";
-import { flatten } from "../src/define.js";
+import { api } from "../src/resources/index.js";
+import { flatten } from "../src/core/define.js";
 
 describe("guardrails", () => {
-  /** The declaration files: everything in src/ that is not tooling, runtime, or generated. */
-  const declarationFiles = () => readdirSync("src").filter((f) => f.endsWith(".ts") && !["api.ts", "define.ts", "roles.ts", "runtime.ts", "index.ts", "generate.ts", "semver.ts", "check.ts", "new.ts"].includes(f));
+  /** The declaration files: everything in src/resources/ except the registry and the roles. */
+  const declarationFiles = () => readdirSync("src/resources").filter((f) => f.endsWith(".ts") && !["index.ts", "roles.ts"].includes(f));
 
-  it("every declaration file in src/ is registered in src/api.ts", () => {
-    const index = readFileSync("src/api.ts", "utf8");
+  it("every declaration file in src/resources/ is registered in src/resources/index.ts", () => {
+    const index = readFileSync("src/resources/index.ts", "utf8");
     const unregistered = declarationFiles().filter((f) => !index.includes(`./${f.replace(/\.ts$/, ".js")}`));
-    expect(unregistered, "these files exist but nothing imports them, so they generate nothing. Add an import and register their exports in src/api.ts, or run `npm run new` next time").toEqual([]);
+    expect(unregistered, "these files exist but nothing imports them, so they generate nothing. Add an import and register their exports in src/resources/index.ts, or run `npm run new` next time").toEqual([]);
   });
 
   it("every exported resource is in api.resources", async () => {
     const missing: string[] = [];
     for (const f of declarationFiles()) {
-      const mod = (await import(/* @vite-ignore */ `../src/${f.replace(/\.ts$/, ".js")}`)) as Record<string, unknown>;
+      const mod = (await import(/* @vite-ignore */ `../src/resources/${f.replace(/\.ts$/, ".js")}`)) as Record<string, unknown>;
       for (const [name, v] of Object.entries(mod)) {
         const isResource = typeof v === "object" && v !== null && "singular" in v && "instance" in v;
         if (isResource && !Object.values(api.resources).includes(v as never)) missing.push(`${f}: ${name}`);
       }
     }
-    expect(missing, "exported with resource() but not listed under `resources` in src/api.ts, so bt.<name> does not exist").toEqual([]);
+    expect(missing, "exported with resource() but not listed under `resources` in src/resources/index.ts, so bt.<name> does not exist").toEqual([]);
   });
 
   it("every generated method is self-describing (JSDoc names its auth and route)", () => {
@@ -47,12 +47,12 @@ describe("guardrails", () => {
   });
 
   it("the hand-written runtime stays small enough to read in one sitting", () => {
-    const lines = readFileSync("src/runtime.ts", "utf8").split("\n").length;
-    expect(lines, "src/runtime.ts is the only HTTP code; if it needs to grow past this, split behaviour into the declaration instead").toBeLessThan(250);
+    const lines = readFileSync("src/core/runtime.ts", "utf8").split("\n").length;
+    expect(lines, "src/core/runtime.ts is the only HTTP code; if it needs to grow past this, split behaviour into the declaration instead").toBeLessThan(250);
   });
 
   it("the generator stays small enough to read in one sitting", () => {
-    const lines = readFileSync("src/generate.ts", "utf8").split("\n").length;
-    expect(lines, "src/generate.ts has grown past the budget; every new emitter is its own reviewed change").toBeLessThan(500);
+    const lines = readFileSync("scripts/generate.ts", "utf8").split("\n").length;
+    expect(lines, "scripts/generate.ts has grown past the budget; every new emitter is its own reviewed change").toBeLessThan(500);
   });
 });

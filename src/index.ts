@@ -7,10 +7,10 @@
  * const event = await bt.event("blueprint", 2026).get();
  * ```
  *
- * Everything under ./generated is emitted from src/. This file and ./runtime.ts
+ * Everything under ./generated is emitted from ./resources. This file and ./core/runtime.ts
  * are the only hand-written code in the published package.
  */
 export { createClient, type BtClient } from "./generated/client.js";
 export * from "./generated/schemas.js";
 export * from "./generated/errors.js";
-export type { ClientConfig } from "./runtime.js";
+export type { ClientConfig } from "./core/runtime.js";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { validate, flatten, type Api } from "../src/define.js";
-import { api } from "../src/api.js";
+import { validate, flatten, type Api } from "../src/core/define.js";
+import { api } from "../src/resources/index.js";
 
 describe("api declaration", () => {
   it("is valid", () => expect(() => validate(api)).not.toThrow());

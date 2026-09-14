@@ -6,14 +6,20 @@ This repo will outlive everyone who understands it. BizTech turns over its exec 
 realistic maintainer is someone with a partial and partly wrong idea of how it works, probably working
 with a coding agent. The repo is designed for that person:
 
-- **One file per change.** Adding or fixing an endpoint touches one declaration file in `src/`.
+- **One file per change.** Adding or fixing an endpoint touches one declaration file in `src/resources/`.
   Nothing else needs to be understood, opened, or edited.
 - **Wrong guesses are cheap.** Every mistake is caught by a machine that says which file and what to
   change. Nothing here can touch production; the contract test is read-only against `api-dev`.
 - **One command says whether you are done.** `npm run check`. Green means commit.
 
-If you find yourself needing to understand `src/generate.ts` or `src/runtime.ts` to add an endpoint,
+If you find yourself needing to understand `scripts/generate.ts` or `src/core/runtime.ts` to add an endpoint,
 that is a bug in this repo. Say so in an issue.
+
+## Where things are
+
+The repo map is in [README.md](./README.md#changing-the-sdk). Short version: `src/resources/` is the API and the
+only folder you edit; `src/core/` is machinery; `src/generated/` is output; `scripts/` is tooling; `docs/reference/`
+is generated and `docs/guides/` is hand-written.
 
 ## Recipes
 
@@ -23,7 +29,7 @@ that is a bug in this repo. Say so in an issue.
 npm run new -- sticker stickers        # singular, then plural (omit plural for a singleton like judgingRound)
 ```
 
-This creates `src/sticker.ts` full of `TODO`s and registers it in `src/api.ts`. Then:
+This creates `src/resources/sticker.ts` full of `TODO`s and registers it in `src/resources/index.ts`. Then:
 
 1. Call the endpoint on `https://api-dev.ubcbiztech.com` (curl, browser, anything) and look at the
    real response. Find its path and method in `serverless-biztechapp/services/<service>/serverless.yml`.
@@ -53,18 +59,18 @@ instead; the test then fails only on new drift, and fails again if the entry goe
 ### `npm run check` says to bump the version
 
 Do what it says: `major` = first number up, `minor` = second number up, reset the rest to `0`. The
-rule is mechanical and lives in `src/semver.ts`; you never need to read it.
+rule is mechanical and lives in `scripts/semver.ts`; you never need to read it.
 
 ### Group resources under one key
 
 Resources that all belong to one thing (an event's judging) share a `scope` and nest under it:
 `bt.judging(eventID, year).team(id).update(…)`. Declare the scope once, export it, and pass it to each
 resource. A keyless resource named after the scope sits on the scope itself: `bt.judging(e, y).get()`.
-See `src/judging.ts`.
+See `src/resources/judging.ts`.
 
 ### Something else
 
-`guides/how-it-works.md` follows one call end to end and says which files you can ignore.
+`docs/guides/how-it-works.md` follows one call end to end and says which files you can ignore.
 
 ## The vocabulary, in one screen
 
@@ -81,7 +87,7 @@ action({ description, auth, input?, output, errors?, route: { method, path, quer
 ```
 
 Field builders: `str int num bool json oneOf(values) list(items) obj(fields) record(values) ref(Entity)`,
-each taking `{ description, optional?, nullable? }`. `auth` is one of the keys in `src/roles.ts`; each role
+each taking `{ description, optional?, nullable? }`. `auth` is one of the keys in `src/resources/roles.ts`; each role
 says which credential the runtime sends (`none`, the `X-Judging-Code` header, or the Cognito bearer token).
 Fields named `{like_this}` in `route.path` come from the key or input; `route.query` names query params;
 the rest is the JSON body.
@@ -91,5 +97,5 @@ the rest is the JSON body.
 - `route.path` is the literal path from `serverless.yml`. Never invent one. Never add a trailing slash.
 - Do not add a role to `roles.ts` because an action needs it. Roles are decided in roles.ts, on purpose, not per endpoint.
   A role's `credential` is what the runtime sends; a code role and a token role never satisfy each other.
-- The generator (`src/generate.ts`) is template strings and must stay readable in one sitting. A test fails if
+- The generator (`scripts/generate.ts`) is template strings and must stay readable in one sitting. A test fails if
   it passes 500 lines. If a change needs a new abstraction there, stop and ask.

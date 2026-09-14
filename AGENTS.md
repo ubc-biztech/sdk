@@ -3,7 +3,7 @@
 Read [`README.md`](./README.md) for how to call it. These are the rules.
 
 - **Never write `fetch(API_URL + "/...")`** for anything the SDK covers. If it does not cover what you need,
-  the fix is a declaration in this repo's `src/`, not a raw call.
+  the fix is a declaration in this repo's `src/resources/`, not a raw call.
 - **Do not catch `ContractViolationError`.** It means the backend returned something the declaration does not
   describe. Report it; the declaration gets fixed.
 - **Undeclared fields are stripped.** If the backend sends `foo` and the type does not have `foo`, you will

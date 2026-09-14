@@ -3,7 +3,7 @@
  * `--enforce <base-package.json>`, refuses when package.json's version bump is smaller
  * than the change requires. Usage:
  *
- *   tsx src/semver.ts <base-api.json> [--enforce <base-package.json>]
+ *   tsx scripts/semver.ts <base-api.json> [--enforce <base-package.json>]
  *
  * Rules (deliberately mechanical):
  *   major — removed role/entity/field/resource/action/link; resource key changed; field kind
@@ -12,8 +12,8 @@
  *   minor — anything else added; input field went required→optional; descriptions changed
  */
 import { readFileSync } from "node:fs";
-import { flatten, validate, type FieldSpec, type Fields, type Api } from "./define.js";
-import { api } from "./api.js";
+import { flatten, validate, type FieldSpec, type Fields, type Api } from "../src/core/define.js";
+import { api } from "../src/resources/index.js";
 
 type Bump = "none" | "minor" | "major";
 type Side = "input" | "output";

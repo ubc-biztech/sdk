@@ -15,7 +15,7 @@
   },
   "include": [
     "src/index.ts",
-    "src/runtime.ts",
+    "src/core/runtime.ts",
     "src/generated/*.ts"
   ]
 }

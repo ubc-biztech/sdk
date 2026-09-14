@@ -1,0 +1,30 @@
+# Changelog
+
+Versions follow the rule in `scripts/semver.ts`: while the major is 0, a breaking change bumps the
+minor. `npm run check` tells you which bump a change needs.
+
+## 0.4.0 — 2026-09-13
+
+- **Breaking:** the SDK now covers hackathon judging only. The `events`, `users`, `registrations` and
+  `teams` declarations were removed; they return one file at a time when an app needs them.
+- **Breaking:** two credentials instead of one bearer token. Each role in `roles.ts` names what it
+  sends: judge and team actions send `X-Judging-Code` from `ClientConfig.getCode`, organizer actions
+  send the Cognito ID token from `ClientConfig.getToken`, public actions send nothing.
+- **Breaking:** organizer actions moved under `bt.judging(e, y).admin` (`get`, `set`, `reviews`) to match
+  the backend's `/admin` routes. There is no admin code and no `Judge.isAdmin`.
+- Layout: `src/resources/` (the API), `src/core/` (machinery), `scripts/` (tooling), `docs/reference/`
+  (generated) and `docs/guides/` (hand-written).
+
+## 0.3.0 — 2026-09-12
+
+- Flat `src/` layout; the generated server side was removed. The backend is hand-written in
+  serverless-biztechapp and the SDK follows its shape.
+- Judging declaration matches the merged backend's document shape.
+
+## 0.2.0 — 2026-09-10
+
+- Scoped resources (`bt.judging(eventID, year).…`) and the first judging declaration.
+
+## 0.1.0 — 2026-09-10
+
+- Initial release: declaration, generator, chained client, contract tests against api-dev.

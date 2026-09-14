@@ -1,4 +1,4 @@
-import type { Roles } from "./define.js";
+import type { Roles } from "../core/define.js";
 
 /**
  * The vocabulary every action's `auth` refers to. Nothing else may invent a role.

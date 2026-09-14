@@ -59,7 +59,7 @@ validated after, and fields the declaration does not include are stripped.
 
 ## Reference
 
-Full per-method reference with input and output tables: [`docs/`](./docs/README.md).
+Full per-method reference with input and output tables: [`docs/reference/`](./docs/reference/README.md).
 
 ### Hackathon judging
 
@@ -130,28 +130,32 @@ import { ReviewSchema } from "@ubc-biztech/sdk";       // z.ZodType<Review>
 
 Replace one call at a time. Keep the old fetch wrapper for everything the SDK does not cover yet, and add a
 lint rule against new uses. If the SDK does not cover an endpoint you need, the fix is a declaration file in
-`src/` of this repo, not a raw fetch. See [`CONTRIBUTING.md`](./CONTRIBUTING.md), and
-[`guides/judging-portal.md`](./guides/judging-portal.md) for a worked migration.
+`src/resources/` of this repo, not a raw fetch. See [`CONTRIBUTING.md`](./CONTRIBUTING.md), and
+[`docs/guides/judging-portal.md`](./docs/guides/judging-portal.md) for a worked migration.
 
 ## Changing the SDK
 
 You do not need to understand this repo to add an endpoint. `npm run new -- <singular> <plural>`
 scaffolds it, `npm run check` tells you what is left, and every error names the file and the fix.
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the recipes and [`guides/how-it-works.md`](./guides/how-it-works.md)
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the recipes and [`docs/guides/how-it-works.md`](./docs/guides/how-it-works.md)
 if you want to follow one call end to end.
 
 ```
 src/
-  judging.ts      the declaration. The only file you edit (until the next service is added beside it).
-  roles.ts        who may call what, and which credential each role sends
-  api.ts          lists every declaration file so the generator can find it
-  define.ts       the builders the declarations are written with (entity, resource, action, str, …)
-  generate.ts     npm run gen: writes generated/ and docs/
-  runtime.ts      the one place HTTP happens
+  resources/      THE API. One file per area; the only folder you edit.
+    judging.ts      hackathon judging: entities, resources, actions, routes, errors
+    roles.ts        who may call what, and which credential each role sends
+    index.ts        registers every resources/ file so the generator finds it
+  core/           hand-written machinery. You should never need to open it.
+    define.ts       the builders resources/ are written with (entity, resource, action, str, …) and the validator
+    runtime.ts      the one place HTTP happens
+  generated/      output of `npm run gen`. Never edit; overwritten every time.
+    client.ts schemas.ts errors.ts api.json
   index.ts        what the package exports
-  generated/      output. Never edit.
-  check.ts, new.ts, semver.ts   the tools behind npm run check / new
-docs/             generated reference
-guides/           migration guides and the end-to-end walkthrough
+scripts/          the commands behind npm run gen / check / new / check:semver
+docs/
+  reference/      generated per-method reference (what each call takes, returns, throws)
+  guides/         hand-written: how-it-works.md (one call end to end), judging-portal.md (a worked migration)
 test/             unit, validation, guardrails, semver rules, and the daily contract test against api-dev
+CHANGELOG.md      what changed in each version
 ```

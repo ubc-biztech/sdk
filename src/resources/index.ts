@@ -1,4 +1,4 @@
-import type { Api } from "./define.js";
+import type { Api } from "../core/define.js";
 import { roles } from "./roles.js";
 import { JudgingEvent, JudgingInfo, JudgingSettings, Rubric, JudgingTeam, Judge, JudgingLink, JudgingPrincipal, Review, judging, judgingAdmin, judgingTeams, reviews } from "./judging.js";
 

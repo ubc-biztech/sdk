@@ -20,24 +20,24 @@
   "files": [
     "dist",
     "docs",
-    "guides",
     "AGENTS.md",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
-    "gen": "tsx src/generate.ts",
-    "check:semver": "tsx src/semver.ts",
+    "gen": "tsx scripts/generate.ts",
+    "check:semver": "tsx scripts/semver.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepare": "npm run build",
     "test": "vitest run",
     "test:contract": "BT_CONTRACT=1 vitest run test/contract.test.ts",
     "ci": "npm run gen && npm run typecheck && npm test && npm run build && git diff --exit-code -- src/generated docs",
-    "check": "tsx src/check.ts",
-    "new": "tsx src/new.ts"
+    "check": "tsx scripts/check.ts",
+    "new": "tsx scripts/new.ts"
   },
   "peerDependencies": {
     "zod": "^4.0.0"

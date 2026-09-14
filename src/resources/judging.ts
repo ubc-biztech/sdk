@@ -10,7 +10,7 @@
  * - Organizers sign in with their BizTech exec account (Cognito). Their routes live under
  *   `bt.judging(e, y).admin` and send the ID token, never a code.
  */
-import { entity, resource, action, link, str, int, num, bool, list, obj, record, ref, oneOf, type Fields } from "./define.js";
+import { entity, resource, action, link, str, int, num, bool, list, obj, record, ref, oneOf, type Fields } from "../core/define.js";
 
 export const judgingScope = {
   name: "judging",

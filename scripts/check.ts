@@ -24,13 +24,13 @@ const steps: Step[] = [
   {
     name: "declaration is valid",
     run: () => {
-      const r = sh("npx tsx -e \"import('./src/define.js').then(async (d) => { const { api } = await import('./src/api.js'); d.validate(api); })\"");
+      const r = sh("npx tsx -e \"import('./src/core/define.js').then(async (d) => { const { api } = await import('./src/resources/index.js'); d.validate(api); })\"");
       if (r.ok) return null;
       // Keep only the message; resolve the `*.ts (resource "x")` hints to the real file.
       let msg = r.out.replace(/^[\s\S]*?Error: /, "").replace(/\n\s+at [\s\S]*$/, "").replace(/\n\nNode\.js v[\s\S]*$/, "");
       msg = msg.replace(/src\/\*\.ts \(resource "(\w+)"\)/g, (_, r: string) => {
-        const hit = sh(`grep -l 'singular: "${r}"' src/*.ts`).out.split("\n")[0];
-        return hit || `src/*.ts (resource "${r}")`;
+        const hit = sh(`grep -l 'singular: "${r}"' src/resources/*.ts`).out.split("\n")[0];
+        return hit || `src/resources/*.ts (resource "${r}")`;
       });
       return msg;
     },
@@ -61,7 +61,7 @@ const steps: Step[] = [
       const r = sh("npx vitest run --reporter=dot");
       return r.ok ? null : tail(r.out, 40);
     },
-    fix: "If the failing test is in test/api.test.ts or test/semver.test.ts and you changed define.ts or generate.ts, the test may need updating. If it is test/runtime.test.ts, the runtime broke; that file is hand-written and small.",
+    fix: "If the failing test is in test/api.test.ts or test/semver.test.ts and you changed src/core/define.ts or scripts/generate.ts, the test may need updating. If it is test/runtime.test.ts, src/core/runtime.ts broke; it is hand-written and small.",
   },
   {
     name: "package version matches the size of the change",
@@ -73,7 +73,7 @@ const steps: Step[] = [
       execSync(`mkdir -p ${tmp}`);
       execSync(`git show origin/main:src/generated/api.json > ${tmp}/base-api.json`, { cwd: root });
       execSync(`git show origin/main:package.json > ${tmp}/base-package.json`, { cwd: root });
-      const r = sh(`npx tsx src/semver.ts ${tmp}/base-api.json --enforce ${tmp}/base-package.json`);
+      const r = sh(`npx tsx scripts/semver.ts ${tmp}/base-api.json --enforce ${tmp}/base-package.json`);
       return r.ok ? null : r.out;
     },
     fix: "Change `version` in package.json as the last line above says (major = first number +1, minor = second number +1, reset the rest to 0).",

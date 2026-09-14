@@ -9,7 +9,7 @@ you want to: it follows a single call all the way through, and then says what yo
 const event = await bt.judging("hellohacks", 2027).get();
 ```
 
-## 1. The declaration — `src/judging.ts`
+## 1. The declaration — `src/resources/judging.ts`
 
 ```ts
 export const judgingScope = { name: "judging", key: { eventID: str({...}), year: int({...}) }, ... };  // → bt.judging(eventID, year)
@@ -19,7 +19,7 @@ export const judging = resource({
   scope: judgingScope,                                 // keyless and named after its scope, so it sits on the scope itself
   instance: {
     get: action({                                      // → .get()
-      auth: "judgingCode",                             // a role from src/roles.ts; its credential is "code"
+      auth: "judgingCode",                             // a role from src/resources/roles.ts; its credential is "code"
       output: ref(JudgingEvent, {...}),
       errors: { UnknownCode: { status: 401, ... } },
       route: { method: "GET", path: "/judging/{eventID}/{year}" },
@@ -29,16 +29,16 @@ export const judging = resource({
 ```
 
 This is the only file a person edits. It is data, not code: builders like `str()` and `action()` just
-return objects. `src/api.ts` lists every resource and entity so the generator can find them.
+return objects. `src/resources/index.ts` lists every resource and entity so the generator can find them.
 
-## 2. Validation — `src/define.ts`, `validate()`
+## 2. Validation — `src/core/define.ts`, `validate()`
 
 Before anything is generated, `validate()` checks the things TypeScript cannot: that `"judgingCode"` is a
 declared role, that `{eventID}` and `{year}` in the path exist as fields, that no description is empty or
 `TODO`, that a role only implies roles with the same credential. Every message names the file and the fix.
 If validation passes, the declaration is coherent even if the person who wrote it does not know why.
 
-## 3. Generation — `src/generate.ts`
+## 3. Generation — `scripts/generate.ts`
 
 `npm run gen` walks the declaration with plain loops and writes three files using template strings:
 
@@ -57,10 +57,10 @@ judging: (eventID: string, year: number) => ({
 }),
 ```
 
-There is no AST manipulation; `src/generate.ts` is `out += \`...\`` all the way down. It also
-writes `docs/*.md` and `api.json` (a snapshot used to classify version bumps).
+There is no AST manipulation; `scripts/generate.ts` is `out += \`...\`` all the way down. It also
+writes `docs/reference/*.md` and `api.json` (a snapshot used to classify version bumps).
 
-## 4. The runtime — `src/runtime.ts`, `Runtime.call()`
+## 4. The runtime — `src/core/runtime.ts`, `Runtime.call()`
 
 The one hand-written place HTTP happens. In order:
 
@@ -85,11 +85,11 @@ fails only on *new* drift.
 
 ## What you can ignore
 
-- **`src/generate.ts`** unless you are adding a new kind of output. Adding endpoints never touches it.
-- **`src/runtime.ts`** unless HTTP itself is wrong. Adding endpoints never touches it.
-- **`src/semver.ts`** entirely. `npm run check` runs it and tells you what version to set.
+- **`scripts/generate.ts`** unless you are adding a new kind of output. Adding endpoints never touches it.
+- **`src/core/runtime.ts`** unless HTTP itself is wrong. Adding endpoints never touches it.
+- **`scripts/semver.ts`** entirely. `npm run check` runs it and tells you what version to set.
 - **`src/generated/`** entirely. Never edit it; it is overwritten.
 
 ## What to understand first, if you want to understand one thing
 
-`src/judging.ts`, top to bottom. Every other declaration file will be the same shape.
+`src/resources/judging.ts`, top to bottom. Every other declaration file will be the same shape.

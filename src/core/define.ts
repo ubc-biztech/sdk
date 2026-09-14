@@ -1,5 +1,5 @@
 /**
- * The builders every declaration file (events.ts, users.ts, judging.ts, …) is written with.
+ * The builders every declaration file in src/resources/ is written with.
  * They carry data only, so generate.ts can walk the result with plain loops.
  * Every field requires a `description`; that text becomes the JSDoc on the client.
  */
@@ -231,7 +231,7 @@ export function validate(o: Api): void {
   const problems: string[] = [];
   const flat = flatten(o);
   const roleList = Object.keys(o.roles).map((r) => `"${r}"`).join(", ");
-  const file = (r: ResourceSpec) => `src/*.ts (resource "${r.singular}")`;
+  const file = (r: ResourceSpec) => `src/resources/*.ts (resource "${r.singular}")`;
 
   const seen = new Map<string, FlatAction>();
   for (const a of flat) {
@@ -245,7 +245,7 @@ export function validate(o: Api): void {
     const at = `${a.key} in ${file(a.resource)}`;
     if (/^\/TODO/.test(s.route.path) || s.route.path.includes("/TODO")) problems.push(`${at}: route.path is still "${s.route.path}". Use the exact path from the service's serverless.yml.`);
     if (!(s.auth in o.roles))
-      problems.push(`${at}: auth is "${s.auth}" but the declared roles are ${roleList}. Pick one, or add the role in src/roles.ts .`);
+      problems.push(`${at}: auth is "${s.auth}" but the declared roles are ${roleList}. Pick one, or add the role in src/resources/roles.ts .`);
     for (const k of Object.keys(s.input ?? {}))
       if (k in a.chainFields) problems.push(`${at}: input field "${k}" is already provided by the chain (${Object.keys(a.chainFields).join(", ")}). Remove it from input.`);
     const pathParams = [...s.route.path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!);
@@ -277,7 +277,7 @@ export function validate(o: Api): void {
     else topNames.set(name, by);
   };
   for (const [rk, r] of Object.entries(o.resources)) {
-    if (!r.scope && rk !== r.singular) problems.push(`src/api.ts: resources.${rk} has singular "${r.singular}". For unscoped resources the key must equal the singular; write \`${r.singular}: …\`.`);
+    if (!r.scope && rk !== r.singular) problems.push(`src/resources/index.ts: resources.${rk} has singular "${r.singular}". For unscoped resources the key must equal the singular; write \`${r.singular}: …\`.`);
     if (!r.scope) {
       claim(r.singular, `resource "${r.singular}"`);
       if (r.plural) claim(r.plural, `resource "${r.singular}"`);
@@ -293,7 +293,7 @@ export function validate(o: Api): void {
       if (!prev) claim(r.scope.name, `scope "${r.scope.name}"`);
       for (const k of Object.keys(r.key)) if (k in r.scope.key) problems.push(`${file(r)}: key field "${k}" is already a scope key field.`);
     }
-    if (r.entity && !(r.entity in o.entities)) problems.push(`${file(r)}: entity "${r.entity}" is not in src/api.ts \`entities\`. Add it there.`);
+    if (r.entity && !(r.entity in o.entities)) problems.push(`${file(r)}: entity "${r.entity}" is not in src/resources/index.ts \`entities\`. Add it there.`);
     if (Object.keys(r.collection).length && !r.plural) problems.push(`${file(r)}: has collection actions but no \`plural\`. Add plural: "…" (it becomes bt.<plural>).`);
     if (!r.description.trim()) problems.push(`${file(r)}: description is empty.`);
     for (const [k, f] of Object.entries(r.key)) if (f.optional) problems.push(`${file(r)}: key field "${k}" cannot be optional; keys are positional arguments.`);
@@ -311,14 +311,14 @@ export function validate(o: Api): void {
     }
   }
   for (const [name, r] of Object.entries(o.roles)) {
-    if (!["none", "code", "token"].includes(r.credential)) problems.push(`src/roles.ts: role ${name} has credential "${r.credential}"; it must be "none", "code" or "token".`);
+    if (!["none", "code", "token"].includes(r.credential)) problems.push(`src/resources/roles.ts: role ${name} has credential "${r.credential}"; it must be "none", "code" or "token".`);
     for (const i of r.implies ?? []) {
-      if (!(i in o.roles)) problems.push(`src/roles.ts: role ${name} implies "${i}", which is not a role. Declared: ${roleList}.`);
-      else if (o.roles[i]!.credential !== r.credential) problems.push(`src/roles.ts: role ${name} (${r.credential}) implies ${i} (${o.roles[i]!.credential}); a role can only imply roles that send the same credential.`);
+      if (!(i in o.roles)) problems.push(`src/resources/roles.ts: role ${name} implies "${i}", which is not a role. Declared: ${roleList}.`);
+      else if (o.roles[i]!.credential !== r.credential) problems.push(`src/resources/roles.ts: role ${name} (${r.credential}) implies ${i} (${o.roles[i]!.credential}); a role can only imply roles that send the same credential.`);
     }
   }
   for (const [name, e] of Object.entries(o.entities)) {
-    if (e.name !== name) problems.push(`src/api.ts: entities.${name} has name "${e.name}". The key must equal the name.`);
+    if (e.name !== name) problems.push(`src/resources/index.ts: entities.${name} has name "${e.name}". The key must equal the name.`);
     if (!e.description.trim()) problems.push(`entity ${name}: description is empty.`);
     for (const [k, f] of Object.entries(e.fields)) walk(f, `entity ${name}: field ${k}`);
   }
@@ -327,14 +327,14 @@ export function validate(o: Api): void {
     ...flat.flatMap((a): [string, string][] => [[`${a.key} in ${file(a.resource)}`, a.spec.description], ...Object.entries(a.spec.errors).map(([en, e]): [string, string] => [`${a.key}: error ${en}`, e.description])]),
     ...Object.values(o.resources).map((r): [string, string] => [file(r), r.description]),
     ...Object.values(o.entities).map((e): [string, string] => [`entity ${e.name}`, e.description]),
-    ...Object.entries(o.roles).map(([r, s]): [string, string] => [`role ${r} in src/roles.ts`, s.description]),
+    ...Object.entries(o.roles).map(([r, s]): [string, string] => [`role ${r} in src/resources/roles.ts`, s.description]),
   ];
   for (const [at, d] of descriptions) if (/\bTODO\b/.test(d)) problems.push(`${at}: description still says TODO. Replace it with what this really is.`);
 
   function walk(f: FieldSpec, at: string) {
     if (!f.description?.trim()) problems.push(`${at}: description is empty. Say what the value means, its unit or format, and when it is absent.`);
     else if (/\bTODO\b/.test(f.description)) problems.push(`${at}: description still says TODO. Replace it with what the value means, its unit or format, and when it is absent.`);
-    if (f.kind === "ref" && !(f.entity in o.entities)) problems.push(`${at}: ref to "${f.entity}", which is not in src/api.ts \`entities\`. Declared: ${Object.keys(o.entities).join(", ")}.`);
+    if (f.kind === "ref" && !(f.entity in o.entities)) problems.push(`${at}: ref to "${f.entity}", which is not in src/resources/index.ts \`entities\`. Declared: ${Object.keys(o.entities).join(", ")}.`);
     if (f.kind === "array") walk(f.items, `${at}[]`);
     if (f.kind === "record") walk(f.values, `${at}{}`);
     if (f.kind === "object") for (const [k, c] of Object.entries(f.fields)) walk(c, `${at}.${k}`);
