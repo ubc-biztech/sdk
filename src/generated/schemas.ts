@@ -74,6 +74,8 @@ export interface JudgingSettings {
   perTeamJudges?: number;
   /** How many prelim teams the portal advances to finals by default. Stored, not enforced. */
   finalsTopN?: number;
+  /** Prelim presentation schedule. Absent until the portal creates one. */
+  schedule?: JudgingSchedule;
 }
 export const JudgingSettingsSchema: z.ZodType<JudgingSettings> = z.object({
   eventName: z.string(),
@@ -87,6 +89,66 @@ export const JudgingSettingsSchema: z.ZodType<JudgingSettings> = z.object({
   maxImages: z.number().int(),
   perTeamJudges: z.number().int().optional(),
   finalsTopN: z.number().int().optional(),
+  schedule: z.lazy(() => JudgingScheduleSchema).optional(),
+});
+
+/** Prelim presentation schedule kept by the portal: rooms of judges, timed blocks, and which team presents in which room during which block. Stored inside settings; the backend does not interpret it. The portal derives each judge's `assignedTeamIds` from their room. */
+export interface JudgingSchedule {
+  /** Rooms, in display order. */
+  rooms: Array<{
+    /** Chosen by the portal. */
+    id: string;
+    /** Room name, e.g. `Room A`. */
+    name: string;
+    /** Judges who sit in this room for every block. */
+    judgeIds: string[];
+  }>;
+  /** Blocks, in time order. */
+  blocks: Array<{
+    /** Chosen by the portal. */
+    id: string;
+    /** Display label, e.g. `Block 1`. */
+    label: string;
+    /** Start time as entered, e.g. `13:00`. */
+    startsAt: string;
+  }>;
+  /** Every scheduled presentation. */
+  slots: Array<{
+    /** Block id. */
+    blockId: string;
+    /** Room id. */
+    roomId: string;
+    /** Team id. */
+    teamId: string;
+  }>;
+  /** Newest first. The portal keeps the last 200. */
+  changes: Array<{
+    /** ISO-8601, when the organizer saved. */
+    at: string;
+    /** What moved, e.g. `Team X: Block 1 / Room A → Block 2 / Room A`. */
+    message: string;
+  }>;
+}
+export const JudgingScheduleSchema: z.ZodType<JudgingSchedule> = z.object({
+  rooms: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    judgeIds: z.array(z.string()),
+  })),
+  blocks: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    startsAt: z.string(),
+  })),
+  slots: z.array(z.object({
+    blockId: z.string(),
+    roomId: z.string(),
+    teamId: z.string(),
+  })),
+  changes: z.array(z.object({
+    at: z.string(),
+    message: z.string(),
+  })),
 });
 
 /** What judges score against. Reviews carry one score per criterion; totals are computed from this. */

@@ -40,6 +40,18 @@ Event phase and switches. Part of JudgingEvent. The backend enforces `phase`, `l
 | `maxImages` | integer | Maximum screenshots per team, enforced on `team.update`. |
 | `perTeamJudges` | integer? | How many judges the portal's auto-assign gives each team. Stored, not enforced. |
 | `finalsTopN` | integer? | How many prelim teams the portal advances to finals by default. Stored, not enforced. |
+| `schedule` | ref? | Prelim presentation schedule. Absent until the portal creates one. |
+
+## JudgingSchedule
+
+Prelim presentation schedule kept by the portal: rooms of judges, timed blocks, and which team presents in which room during which block. Stored inside settings; the backend does not interpret it. The portal derives each judge's `assignedTeamIds` from their room.
+
+| Field | Type | Description |
+|---|---|---|
+| `rooms` | array | Rooms, in display order. |
+| `blocks` | array | Blocks, in time order. |
+| `slots` | array | Every scheduled presentation. |
+| `changes` | array | Newest first. The portal keeps the last 200. |
 
 ## Rubric
 

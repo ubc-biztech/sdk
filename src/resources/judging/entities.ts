@@ -1,6 +1,32 @@
 import { entity, str, int, num, bool, list, obj, record, ref, oneOf, type Fields } from "../../core/define.js";
 import { PHASES, ROUNDS } from "./shared.js";
 
+export const JudgingSchedule = entity({
+  name: "JudgingSchedule",
+  description: "Prelim presentation schedule kept by the portal: rooms of judges, timed blocks, and which team presents in which room during which block. Stored inside settings; the backend does not interpret it. The portal derives each judge's `assignedTeamIds` from their room.",
+  fields: {
+    rooms: list(obj({
+      id: str({ description: "Chosen by the portal." }),
+      name: str({ description: "Room name, e.g. `Room A`." }),
+      judgeIds: list(str({ description: "Judge id." }), { description: "Judges who sit in this room for every block." }),
+    }, { description: "A room." }), { description: "Rooms, in display order." }),
+    blocks: list(obj({
+      id: str({ description: "Chosen by the portal." }),
+      label: str({ description: "Display label, e.g. `Block 1`." }),
+      startsAt: str({ description: "Start time as entered, e.g. `13:00`." }),
+    }, { description: "A block: every room judges at the same time." }), { description: "Blocks, in time order." }),
+    slots: list(obj({
+      blockId: str({ description: "Block id." }),
+      roomId: str({ description: "Room id." }),
+      teamId: str({ description: "Team id." }),
+    }, { description: "One team presenting in one room during one block." }), { description: "Every scheduled presentation." }),
+    changes: list(obj({
+      at: str({ description: "ISO-8601, when the organizer saved." }),
+      message: str({ description: "What moved, e.g. `Team X: Block 1 / Room A → Block 2 / Room A`." }),
+    }, { description: "One logged change." }), { description: "Newest first. The portal keeps the last 200." }),
+  },
+});
+
 export const JudgingSettings = entity({
   name: "JudgingSettings",
   description: "Event phase and switches. Part of JudgingEvent. The backend enforces `phase`, `lockSubmissions`, `maxImages`, `finalsTeamIds`, `finalsJudgeIds`, `showTeamFeedback` and `allowJudgeSeeOthers`; the rest is stored for the portal.",
@@ -16,6 +42,7 @@ export const JudgingSettings = entity({
     maxImages: int({ description: "Maximum screenshots per team, enforced on `team.update`." }),
     perTeamJudges: int({ optional: true, description: "How many judges the portal's auto-assign gives each team. Stored, not enforced." }),
     finalsTopN: int({ optional: true, description: "How many prelim teams the portal advances to finals by default. Stored, not enforced." }),
+    schedule: ref(JudgingSchedule, { optional: true, description: "Prelim presentation schedule. Absent until the portal creates one." }),
   },
 });
 

@@ -173,6 +173,106 @@
           "kind": "integer",
           "optional": true,
           "description": "How many prelim teams the portal advances to finals by default. Stored, not enforced."
+        },
+        "schedule": {
+          "kind": "ref",
+          "entity": "JudgingSchedule",
+          "optional": true,
+          "description": "Prelim presentation schedule. Absent until the portal creates one."
+        }
+      }
+    },
+    "JudgingSchedule": {
+      "name": "JudgingSchedule",
+      "description": "Prelim presentation schedule kept by the portal: rooms of judges, timed blocks, and which team presents in which room during which block. Stored inside settings; the backend does not interpret it. The portal derives each judge's `assignedTeamIds` from their room.",
+      "fields": {
+        "rooms": {
+          "kind": "array",
+          "items": {
+            "kind": "object",
+            "fields": {
+              "id": {
+                "kind": "string",
+                "description": "Chosen by the portal."
+              },
+              "name": {
+                "kind": "string",
+                "description": "Room name, e.g. `Room A`."
+              },
+              "judgeIds": {
+                "kind": "array",
+                "items": {
+                  "kind": "string",
+                  "description": "Judge id."
+                },
+                "description": "Judges who sit in this room for every block."
+              }
+            },
+            "description": "A room."
+          },
+          "description": "Rooms, in display order."
+        },
+        "blocks": {
+          "kind": "array",
+          "items": {
+            "kind": "object",
+            "fields": {
+              "id": {
+                "kind": "string",
+                "description": "Chosen by the portal."
+              },
+              "label": {
+                "kind": "string",
+                "description": "Display label, e.g. `Block 1`."
+              },
+              "startsAt": {
+                "kind": "string",
+                "description": "Start time as entered, e.g. `13:00`."
+              }
+            },
+            "description": "A block: every room judges at the same time."
+          },
+          "description": "Blocks, in time order."
+        },
+        "slots": {
+          "kind": "array",
+          "items": {
+            "kind": "object",
+            "fields": {
+              "blockId": {
+                "kind": "string",
+                "description": "Block id."
+              },
+              "roomId": {
+                "kind": "string",
+                "description": "Room id."
+              },
+              "teamId": {
+                "kind": "string",
+                "description": "Team id."
+              }
+            },
+            "description": "One team presenting in one room during one block."
+          },
+          "description": "Every scheduled presentation."
+        },
+        "changes": {
+          "kind": "array",
+          "items": {
+            "kind": "object",
+            "fields": {
+              "at": {
+                "kind": "string",
+                "description": "ISO-8601, when the organizer saved."
+              },
+              "message": {
+                "kind": "string",
+                "description": "What moved, e.g. `Team X: Block 1 / Room A → Block 2 / Room A`."
+              }
+            },
+            "description": "One logged change."
+          },
+          "description": "Newest first. The portal keeps the last 200."
         }
       }
     },

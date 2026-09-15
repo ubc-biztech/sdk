@@ -3,6 +3,11 @@
 Versions follow the rule in `scripts/semver.ts`: while the major is 0, a breaking change bumps the
 minor. `npm run check` tells you which bump a change needs.
 
+## 0.5.0 — 2026-09-15
+
+- `JudgingSettings.schedule` (optional): rooms of judges, timed blocks, and slots placing a team in a
+  room for a block, plus a change log. Kept by bt-judging; the backend stores it verbatim.
+
 ## 0.4.1 — 2026-09-13
 
 - Fix: in browsers every call failed with `Illegal invocation`, because `fetch` was invoked with the
