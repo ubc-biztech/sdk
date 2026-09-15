@@ -51,6 +51,7 @@ Prelim presentation schedule kept by the portal: rooms of judges, timed blocks, 
 | `rooms` | array | Rooms, in display order. |
 | `blocks` | array | Blocks, in time order. |
 | `slots` | array | Every scheduled presentation. |
+| `activeBlockId` | string? | The block organizers have marked as happening now. Absent until one is set. |
 | `changes` | array | Newest first. The portal keeps the last 200. |
 
 ## Rubric

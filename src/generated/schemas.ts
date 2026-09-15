@@ -121,6 +121,8 @@ export interface JudgingSchedule {
     /** Team id. */
     teamId: string;
   }>;
+  /** The block organizers have marked as happening now. Absent until one is set. */
+  activeBlockId?: string;
   /** Newest first. The portal keeps the last 200. */
   changes: Array<{
     /** ISO-8601, when the organizer saved. */
@@ -145,6 +147,7 @@ export const JudgingScheduleSchema: z.ZodType<JudgingSchedule> = z.object({
     roomId: z.string(),
     teamId: z.string(),
   })),
+  activeBlockId: z.string().optional(),
   changes: z.array(z.object({
     at: z.string(),
     message: z.string(),

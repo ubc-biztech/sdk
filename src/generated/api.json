@@ -256,6 +256,11 @@
           },
           "description": "Every scheduled presentation."
         },
+        "activeBlockId": {
+          "kind": "string",
+          "optional": true,
+          "description": "The block organizers have marked as happening now. Absent until one is set."
+        },
         "changes": {
           "kind": "array",
           "items": {
