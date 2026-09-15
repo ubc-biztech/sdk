@@ -125,6 +125,13 @@ export interface JudgingSchedule {
   }>;
   /** The block organizers have marked as happening now. Absent until one is set. */
   activeBlockId?: string;
+  /** Exceptions to rooms: pairs removed from the judge's list and from coverage, e.g. a judge who left early. The schedule itself is unchanged. */
+  exclusions?: Array<{
+    /** Judge id. */
+    judgeId: string;
+    /** Team id. */
+    teamId: string;
+  }>;
   /** Newest first. The portal keeps the last 200. */
   changes: Array<{
     /** ISO-8601, when the organizer saved. */
@@ -153,6 +160,10 @@ export const JudgingScheduleSchema: z.ZodType<JudgingSchedule> = z.object({
     teamId: z.string(),
   })),
   activeBlockId: z.string().optional(),
+  exclusions: z.array(z.object({
+    judgeId: z.string(),
+    teamId: z.string(),
+  })).optional(),
   changes: z.array(z.object({
     at: z.string(),
     message: z.string(),

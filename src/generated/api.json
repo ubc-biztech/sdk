@@ -266,6 +266,25 @@
           "optional": true,
           "description": "The block organizers have marked as happening now. Absent until one is set."
         },
+        "exclusions": {
+          "kind": "array",
+          "items": {
+            "kind": "object",
+            "fields": {
+              "judgeId": {
+                "kind": "string",
+                "description": "Judge id."
+              },
+              "teamId": {
+                "kind": "string",
+                "description": "Team id."
+              }
+            },
+            "description": "A judge who will not review a team their room judges."
+          },
+          "optional": true,
+          "description": "Exceptions to rooms: pairs removed from the judge's list and from coverage, e.g. a judge who left early. The schedule itself is unchanged."
+        },
         "changes": {
           "kind": "array",
           "items": {

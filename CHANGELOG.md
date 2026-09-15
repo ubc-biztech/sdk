@@ -3,6 +3,11 @@
 Versions follow the rule in `scripts/semver.ts`: while the major is 0, a breaking change bumps the
 minor. `npm run check` tells you which bump a change needs.
 
+## 0.9.0 — 2026-09-15
+
+- `JudgingSchedule.exclusions` (optional): judge and team pairs removed from the judge's list without
+  changing the schedule, for judges who leave early.
+
 ## 0.8.0 — 2026-09-15
 
 - `JudgingSchedule.changes[].by` (optional): the organizer's email.

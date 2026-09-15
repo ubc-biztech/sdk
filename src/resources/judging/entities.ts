@@ -22,6 +22,10 @@ export const JudgingSchedule = entity({
       teamId: str({ description: "Team id." }),
     }, { description: "One team presenting in one room during one block." }), { description: "Every scheduled presentation." }),
     activeBlockId: str({ optional: true, description: "The block organizers have marked as happening now. Absent until one is set." }),
+    exclusions: list(obj({
+      judgeId: str({ description: "Judge id." }),
+      teamId: str({ description: "Team id." }),
+    }, { description: "A judge who will not review a team their room judges." }), { optional: true, description: "Exceptions to rooms: pairs removed from the judge's list and from coverage, e.g. a judge who left early. The schedule itself is unchanged." }),
     changes: list(obj({
       at: str({ description: "ISO-8601, when the organizer saved." }),
       message: str({ description: "What moved, e.g. `Team X: Block 1 / Room A → Block 2 / Room A`." }),
