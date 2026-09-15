@@ -25,6 +25,7 @@ export const JudgingSchedule = entity({
     changes: list(obj({
       at: str({ description: "ISO-8601, when the organizer saved." }),
       message: str({ description: "What moved, e.g. `Team X: Block 1 / Room A → Block 2 / Room A`." }),
+      by: str({ optional: true, description: "Email of the organizer who saved." }),
     }, { description: "One logged change." }), { description: "Newest first. The portal keeps the last 200." }),
   },
 });

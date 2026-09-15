@@ -131,6 +131,8 @@ export interface JudgingSchedule {
     at: string;
     /** What moved, e.g. `Team X: Block 1 / Room A → Block 2 / Room A`. */
     message: string;
+    /** Email of the organizer who saved. */
+    by?: string;
   }>;
 }
 export const JudgingScheduleSchema: z.ZodType<JudgingSchedule> = z.object({
@@ -154,6 +156,7 @@ export const JudgingScheduleSchema: z.ZodType<JudgingSchedule> = z.object({
   changes: z.array(z.object({
     at: z.string(),
     message: z.string(),
+    by: z.string().optional(),
   })),
 });
 

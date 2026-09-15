@@ -278,6 +278,11 @@
               "message": {
                 "kind": "string",
                 "description": "What moved, e.g. `Team X: Block 1 / Room A → Block 2 / Room A`."
+              },
+              "by": {
+                "kind": "string",
+                "optional": true,
+                "description": "Email of the organizer who saved."
               }
             },
             "description": "One logged change."
