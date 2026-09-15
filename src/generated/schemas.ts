@@ -102,6 +102,8 @@ export interface JudgingSchedule {
     name: string;
     /** Judges who sit in this room for every block. */
     judgeIds: string[];
+    /** Name of the volunteer who runs the room, shown to teams on the display board instead of the judges. */
+    usher?: string;
   }>;
   /** Blocks, in time order. */
   blocks: Array<{
@@ -136,6 +138,7 @@ export const JudgingScheduleSchema: z.ZodType<JudgingSchedule> = z.object({
     id: z.string(),
     name: z.string(),
     judgeIds: z.array(z.string()),
+    usher: z.string().optional(),
   })),
   blocks: z.array(z.object({
     id: z.string(),

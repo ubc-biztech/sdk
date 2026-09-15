@@ -3,6 +3,10 @@
 Versions follow the rule in `scripts/semver.ts`: while the major is 0, a breaking change bumps the
 minor. `npm run check` tells you which bump a change needs.
 
+## 0.7.0 — 2026-09-15
+
+- `JudgingSchedule.rooms[].usher` (optional): the room's usher, shown to teams instead of judges.
+
 ## 0.6.0 — 2026-09-15
 
 - `JudgingSchedule.activeBlockId` (optional): the block organizers mark as current.

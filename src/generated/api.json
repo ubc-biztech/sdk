@@ -206,6 +206,11 @@
                   "description": "Judge id."
                 },
                 "description": "Judges who sit in this room for every block."
+              },
+              "usher": {
+                "kind": "string",
+                "optional": true,
+                "description": "Name of the volunteer who runs the room, shown to teams on the display board instead of the judges."
               }
             },
             "description": "A room."

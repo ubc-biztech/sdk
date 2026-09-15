@@ -9,6 +9,7 @@ export const JudgingSchedule = entity({
       id: str({ description: "Chosen by the portal." }),
       name: str({ description: "Room name, e.g. `Room A`." }),
       judgeIds: list(str({ description: "Judge id." }), { description: "Judges who sit in this room for every block." }),
+      usher: str({ optional: true, description: "Name of the volunteer who runs the room, shown to teams on the display board instead of the judges." }),
     }, { description: "A room." }), { description: "Rooms, in display order." }),
     blocks: list(obj({
       id: str({ description: "Chosen by the portal." }),
