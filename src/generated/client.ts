@@ -4,6 +4,22 @@ import * as S from "./schemas.js";
 import * as E from "./errors.js";
 
 const meta = {
+  "judgingPortal.get": {
+    key: "judgingPortal.get", method: "GET", path: "/judging", query: [], fixedQuery: {},
+    auth: "public", credential: "none", input: S.JudgingPortalGetWireSchema, output: S.JudgingPortalGetOutputSchema, errors: {  },
+  },
+  "judgingPortal.setDefault": {
+    key: "judgingPortal.setDefault", method: "PUT", path: "/judging/default", query: [], fixedQuery: {},
+    auth: "admin", credential: "token", input: S.JudgingPortalSetDefaultWireSchema, output: S.JudgingPortalSetDefaultOutputSchema, errors: { 403: E.ForbiddenError, 406: E.InvalidInputError, 404: E.EventNotFoundError },
+  },
+  "judgingPortal.create": {
+    key: "judgingPortal.create", method: "POST", path: "/judging", query: [], fixedQuery: {},
+    auth: "admin", credential: "token", input: S.JudgingPortalCreateWireSchema, output: S.JudgingPortalCreateOutputSchema, errors: { 403: E.ForbiddenError, 406: E.InvalidInputError, 409: E.EventExistsError },
+  },
+  "eventImage.uploadUrl": {
+    key: "eventImage.uploadUrl", method: "POST", path: "/events/event-image-upload-url", query: [], fixedQuery: {},
+    auth: "admin", credential: "token", input: S.EventImageUploadUrlWireSchema, output: S.EventImageUploadUrlOutputSchema, errors: { 403: E.ForbiddenError, 400: E.InvalidImageError },
+  },
   "judging.info": {
     key: "judging.info", method: "GET", path: "/judging/{eventID}/{year}", query: [], fixedQuery: {},
     auth: "public", credential: "none", input: S.JudgingInfoWireSchema, output: S.JudgingInfoOutputSchema, errors: { 404: E.EventNotFoundError },
@@ -45,6 +61,43 @@ const meta = {
 export function createClient(config: ClientConfig) {
   const rt = new Runtime(config);
   return {
+    /** Discover judging events and manage the shared landing event. */
+    judgingPortal: {
+      /**
+       * Public event names, phases and branding, newest year first. No codes, teams or reviews.
+       * 
+       * Auth: `public` — No credential. Anyone on the internet.
+       * Route: `GET /judging`
+       */
+      get: () => rt.call<S.JudgingPortalGetOutput>(meta["judgingPortal.get"], {}),
+      /**
+       * Choose the existing event new visitors see first. Does not modify event data.
+       * 
+       * Auth: `admin` — A Cognito ID token for a BizTech exec (today: a verified @ubcbiztech.com email). Not a code.
+       * Route: `PUT /judging/default`
+       * Throws: `ForbiddenError` (403) The token is valid but its account is not a BizTech admin.; `InvalidInputError` (406) Invalid event name, ID or year.; `EventNotFoundError` (404) Create the event first.
+       */
+      setDefault: (input: S.JudgingPortalSetDefaultInput) => rt.call<S.JudgingPortalSetDefaultOutput>(meta["judgingPortal.setDefault"], input),
+      /**
+       * Create an empty event in submission phase. Existing events are never replaced. Feedback is initially hidden.
+       * 
+       * Auth: `admin` — A Cognito ID token for a BizTech exec (today: a verified @ubcbiztech.com email). Not a code.
+       * Route: `POST /judging`
+       * Throws: `ForbiddenError` (403) The token is valid but its account is not a BizTech admin.; `InvalidInputError` (406) Invalid event name, ID or year.; `EventExistsError` (409) The ID and year already exist; select that event instead.
+       */
+      create: (input: S.JudgingPortalCreateInput) => rt.call<S.JudgingPortalCreateOutput>(meta["judgingPortal.create"], input),
+    },
+    /** Upload event branding through the existing event image service. */
+    eventImage: {
+      /**
+       * Create a signed image upload URL, valid for 60 seconds. PUT the file bytes to uploadUrl with its Content-Type, then save publicUrl on the event.
+       * 
+       * Auth: `admin` — A Cognito ID token for a BizTech exec (today: a verified @ubcbiztech.com email). Not a code.
+       * Route: `POST /events/event-image-upload-url`
+       * Throws: `ForbiddenError` (403) The token is valid but its account is not a BizTech admin.; `InvalidImageError` (400) Missing fields or a non-image file type.
+       */
+      uploadUrl: (input: S.EventImageUploadUrlInput) => rt.call<S.EventImageUploadUrlOutput>(meta["eventImage.uploadUrl"], input),
+    },
     /** One event's judging. Keyed like an event: (eventID, year). */
     judging: (eventID: string, year: number) => ({
       /**

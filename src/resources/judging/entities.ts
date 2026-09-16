@@ -39,6 +39,7 @@ export const JudgingSettings = entity({
   description: "Event phase and switches. Part of JudgingEvent. The backend enforces `phase`, `lockSubmissions`, `maxImages`, `finalsTeamIds`, `finalsJudgeIds`, `showTeamFeedback` and `allowJudgeSeeOthers`; the rest is stored for the portal.",
   fields: {
     eventName: str({ description: "Display name, e.g. `HelloHacks 2027`." }),
+    imageUrl: str({ optional: true, description: "Public event photo or logo URL." }),
     phase: oneOf(PHASES, { description: "`submission`: teams edit their entries. `prelim`: judges score. `finals`: finals judges score finalist teams. `closed`: nothing changes." }),
     finalsTeamIds: list(str({ description: "Team id." }), { description: "Teams in the finals round. Empty until finals are set up." }),
     finalsJudgeIds: list(str({ description: "Judge id." }), { description: "Judges who score finals. Empty until finals are set up." }),
@@ -148,7 +149,7 @@ export const JudgingInfo = entity({
   name: "JudgingInfo",
   description: "What anyone may see before logging in.",
   fields: {
-    settings: obj({ eventName: str({ description: "Display name." }), phase: oneOf(PHASES, { description: "Current phase." }) }, { description: "Name and phase only." }),
+    settings: obj({ eventName: str({ description: "Display name." }), phase: oneOf(PHASES, { description: "Current phase." }), imageUrl: str({ optional: true, description: "Public event photo or logo URL." }) }, { description: "Public name, phase and branding." }),
     links: list(ref(JudgingLink, { description: "A link." }), { description: "Home-page links, in order." }),
   },
 });

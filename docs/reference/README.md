@@ -13,6 +13,8 @@ Generated from the declaration in src/resources/. Every fact here is also in the
 
 ## Resources
 
+- [`judgingPortal`](./judgingPortal.md) — `bt.judgingPortal.get`, `bt.judgingPortal.setDefault`, `bt.judgingPortal.create`
+- [`eventImage`](./eventImage.md) — `bt.eventImage.uploadUrl`
 - [`judging`](./judging.md) — `bt.judging(eventID, year).info`, `bt.judging(eventID, year).get`
 - [`judging.admin`](./judging.admin.md) — `bt.judging(eventID, year).admin.get`, `bt.judging(eventID, year).admin.set`, `bt.judging(eventID, year).admin.reviews`
 - [`judging.team`](./judging.team.md) — `bt.judging(eventID, year).team(id).update`, `bt.judging(eventID, year).team(id).review` · links: `reviews`

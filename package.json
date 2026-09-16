@@ -1,6 +1,6 @@
 {
   "name": "@ubc-biztech/sdk",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": "Typed, chained client for BizTech club data, generated from one declaration.",
   "repository": {
     "type": "git",

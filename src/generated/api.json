@@ -95,9 +95,14 @@
                 "closed"
               ],
               "description": "Current phase."
+            },
+            "imageUrl": {
+              "kind": "string",
+              "optional": true,
+              "description": "Public event photo or logo URL."
             }
           },
-          "description": "Name and phase only."
+          "description": "Public name, phase and branding."
         },
         "links": {
           "kind": "array",
@@ -117,6 +122,11 @@
         "eventName": {
           "kind": "string",
           "description": "Display name, e.g. `HelloHacks 2027`."
+        },
+        "imageUrl": {
+          "kind": "string",
+          "optional": true,
+          "description": "Public event photo or logo URL."
         },
         "phase": {
           "kind": "enum",
@@ -539,6 +549,232 @@
     }
   },
   "resources": {
+    "judgingPortal": {
+      "singular": "judgingPortal",
+      "description": "Discover judging events and manage the shared landing event.",
+      "key": {},
+      "collection": {},
+      "instance": {
+        "get": {
+          "errors": {},
+          "description": "Public event names, phases and branding, newest year first. No codes, teams or reviews.",
+          "auth": "public",
+          "output": {
+            "kind": "object",
+            "fields": {
+              "events": {
+                "kind": "array",
+                "items": {
+                  "kind": "object",
+                  "fields": {
+                    "eventID": {
+                      "kind": "string",
+                      "description": "Lowercase event slug, such as hellohacks."
+                    },
+                    "year": {
+                      "kind": "integer",
+                      "description": "Event year, from 2000 to 2100."
+                    },
+                    "eventName": {
+                      "kind": "string",
+                      "description": "Display name."
+                    },
+                    "phase": {
+                      "kind": "enum",
+                      "values": [
+                        "submission",
+                        "prelim",
+                        "finals",
+                        "closed"
+                      ],
+                      "description": "Current phase."
+                    },
+                    "imageUrl": {
+                      "kind": "string",
+                      "optional": true,
+                      "description": "Public event image URL."
+                    }
+                  },
+                  "description": "An available event."
+                },
+                "description": "Available judging events."
+              },
+              "defaultEvent": {
+                "kind": "object",
+                "fields": {
+                  "eventID": {
+                    "kind": "string",
+                    "description": "Lowercase event slug, such as hellohacks."
+                  },
+                  "year": {
+                    "kind": "integer",
+                    "description": "Event year, from 2000 to 2100."
+                  }
+                },
+                "nullable": true,
+                "description": "Shared landing event, or null before one is chosen."
+              }
+            },
+            "description": "Event catalog."
+          },
+          "route": {
+            "method": "GET",
+            "path": "/judging"
+          }
+        },
+        "setDefault": {
+          "errors": {
+            "Forbidden": {
+              "status": 403,
+              "description": "The token is valid but its account is not a BizTech admin."
+            },
+            "InvalidInput": {
+              "status": 406,
+              "description": "Invalid event name, ID or year."
+            },
+            "EventNotFound": {
+              "status": 404,
+              "description": "Create the event first."
+            }
+          },
+          "description": "Choose the existing event new visitors see first. Does not modify event data.",
+          "auth": "admin",
+          "input": {
+            "eventID": {
+              "kind": "string",
+              "description": "Lowercase event slug, such as hellohacks."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year, from 2000 to 2100."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "eventID": {
+                "kind": "string",
+                "description": "Lowercase event slug, such as hellohacks."
+              },
+              "year": {
+                "kind": "integer",
+                "description": "Event year, from 2000 to 2100."
+              }
+            },
+            "description": "The saved default event."
+          },
+          "route": {
+            "method": "PUT",
+            "path": "/judging/default"
+          }
+        },
+        "create": {
+          "errors": {
+            "Forbidden": {
+              "status": 403,
+              "description": "The token is valid but its account is not a BizTech admin."
+            },
+            "InvalidInput": {
+              "status": 406,
+              "description": "Invalid event name, ID or year."
+            },
+            "EventExists": {
+              "status": 409,
+              "description": "The ID and year already exist; select that event instead."
+            }
+          },
+          "description": "Create an empty event in submission phase. Existing events are never replaced. Feedback is initially hidden.",
+          "auth": "admin",
+          "input": {
+            "eventID": {
+              "kind": "string",
+              "description": "Lowercase event slug, such as hellohacks."
+            },
+            "year": {
+              "kind": "integer",
+              "description": "Event year, from 2000 to 2100."
+            },
+            "eventName": {
+              "kind": "string",
+              "description": "Display name, up to 120 characters."
+            }
+          },
+          "output": {
+            "kind": "ref",
+            "entity": "JudgingEvent",
+            "description": "The new event."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/judging"
+          }
+        }
+      },
+      "links": {}
+    },
+    "eventImage": {
+      "singular": "eventImage",
+      "description": "Upload event branding through the existing event image service.",
+      "key": {},
+      "collection": {},
+      "instance": {
+        "uploadUrl": {
+          "errors": {
+            "Forbidden": {
+              "status": 403,
+              "description": "The token is valid but its account is not a BizTech admin."
+            },
+            "InvalidImage": {
+              "status": 400,
+              "description": "Missing fields or a non-image file type."
+            }
+          },
+          "description": "Create a signed image upload URL, valid for 60 seconds. PUT the file bytes to uploadUrl with its Content-Type, then save publicUrl on the event.",
+          "auth": "admin",
+          "input": {
+            "fileType": {
+              "kind": "string",
+              "description": "Image MIME type."
+            },
+            "fileName": {
+              "kind": "string",
+              "description": "Original file name, including extension."
+            },
+            "prefix": {
+              "kind": "enum",
+              "values": [
+                "original",
+                "optimized"
+              ],
+              "description": "Image folder."
+            },
+            "eventId": {
+              "kind": "string",
+              "description": "Event identifier for the storage folder."
+            }
+          },
+          "output": {
+            "kind": "object",
+            "fields": {
+              "uploadUrl": {
+                "kind": "string",
+                "description": "Signed PUT URL."
+              },
+              "publicUrl": {
+                "kind": "string",
+                "description": "Permanent public image URL."
+              }
+            },
+            "description": "Upload destination."
+          },
+          "route": {
+            "method": "POST",
+            "path": "/events/event-image-upload-url"
+          }
+        }
+      },
+      "links": {}
+    },
     "judging": {
       "singular": "judging",
       "description": "The event's judging as one document. `bt.judging(e, y).info()` before login, `.get()` with a code (which is also login).",

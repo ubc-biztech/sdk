@@ -32,12 +32,14 @@ export const JudgingEventSchema: z.ZodType<JudgingEvent> = z.object({
 
 /** What anyone may see before logging in. */
 export interface JudgingInfo {
-  /** Name and phase only. */
+  /** Public name, phase and branding. */
   settings: {
     /** Display name. */
     eventName: string;
     /** Current phase. */
     phase: "submission" | "prelim" | "finals" | "closed";
+    /** Public event photo or logo URL. */
+    imageUrl?: string;
   };
   /** Home-page links, in order. */
   links: JudgingLink[];
@@ -46,6 +48,7 @@ export const JudgingInfoSchema: z.ZodType<JudgingInfo> = z.object({
   settings: z.object({
     eventName: z.string(),
     phase: z.enum(["submission", "prelim", "finals", "closed"]),
+    imageUrl: z.string().optional(),
   }),
   links: z.array(z.lazy(() => JudgingLinkSchema)),
 });
@@ -54,6 +57,8 @@ export const JudgingInfoSchema: z.ZodType<JudgingInfo> = z.object({
 export interface JudgingSettings {
   /** Display name, e.g. `HelloHacks 2027`. */
   eventName: string;
+  /** Public event photo or logo URL. */
+  imageUrl?: string;
   /** `submission`: teams edit their entries. `prelim`: judges score. `finals`: finals judges score finalist teams. `closed`: nothing changes. */
   phase: "submission" | "prelim" | "finals" | "closed";
   /** Teams in the finals round. Empty until finals are set up. */
@@ -79,6 +84,7 @@ export interface JudgingSettings {
 }
 export const JudgingSettingsSchema: z.ZodType<JudgingSettings> = z.object({
   eventName: z.string(),
+  imageUrl: z.string().optional(),
   phase: z.enum(["submission", "prelim", "finals", "closed"]),
   finalsTeamIds: z.array(z.string()),
   finalsJudgeIds: z.array(z.string()),
@@ -321,6 +327,123 @@ export const ReviewSchema: z.ZodType<Review> = z.object({
 });
 
 // ─── Action inputs and outputs ───
+
+export const JudgingPortalGetWireSchema = z.object({
+});
+/** Everything the server receives for `bt.judgingPortal.get`: scope key, resource key, and input. */
+export type JudgingPortalGetWire = z.infer<typeof JudgingPortalGetWireSchema>;
+/** Output of `bt.judgingPortal.get`. Event catalog. */
+export type JudgingPortalGetOutput = {
+  /** Available judging events. */
+  events: Array<{
+    /** Lowercase event slug, such as hellohacks. */
+    eventID: string;
+    /** Event year, from 2000 to 2100. */
+    year: number;
+    /** Display name. */
+    eventName: string;
+    /** Current phase. */
+    phase: "submission" | "prelim" | "finals" | "closed";
+    /** Public event image URL. */
+    imageUrl?: string;
+  }>;
+  /** Shared landing event, or null before one is chosen. */
+  defaultEvent: {
+    /** Lowercase event slug, such as hellohacks. */
+    eventID: string;
+    /** Event year, from 2000 to 2100. */
+    year: number;
+  } | null;
+};
+export const JudgingPortalGetOutputSchema: z.ZodType<JudgingPortalGetOutput> = z.object({
+  events: z.array(z.object({
+    eventID: z.string(),
+    year: z.number().int(),
+    eventName: z.string(),
+    phase: z.enum(["submission", "prelim", "finals", "closed"]),
+    imageUrl: z.string().optional(),
+  })),
+  defaultEvent: z.object({
+    eventID: z.string(),
+    year: z.number().int(),
+  }).nullable(),
+});
+
+/** Input for `bt.judgingPortal.setDefault`. */
+export interface JudgingPortalSetDefaultInput {
+  /** Lowercase event slug, such as hellohacks. */
+  eventID: string;
+  /** Event year, from 2000 to 2100. */
+  year: number;
+}
+export const JudgingPortalSetDefaultWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+/** Everything the server receives for `bt.judgingPortal.setDefault`: scope key, resource key, and input. */
+export type JudgingPortalSetDefaultWire = z.infer<typeof JudgingPortalSetDefaultWireSchema>;
+/** Output of `bt.judgingPortal.setDefault`. The saved default event. */
+export type JudgingPortalSetDefaultOutput = {
+  /** Lowercase event slug, such as hellohacks. */
+  eventID: string;
+  /** Event year, from 2000 to 2100. */
+  year: number;
+};
+export const JudgingPortalSetDefaultOutputSchema: z.ZodType<JudgingPortalSetDefaultOutput> = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+});
+
+/** Input for `bt.judgingPortal.create`. */
+export interface JudgingPortalCreateInput {
+  /** Lowercase event slug, such as hellohacks. */
+  eventID: string;
+  /** Event year, from 2000 to 2100. */
+  year: number;
+  /** Display name, up to 120 characters. */
+  eventName: string;
+}
+export const JudgingPortalCreateWireSchema = z.object({
+  eventID: z.string(),
+  year: z.number().int(),
+  eventName: z.string(),
+});
+/** Everything the server receives for `bt.judgingPortal.create`: scope key, resource key, and input. */
+export type JudgingPortalCreateWire = z.infer<typeof JudgingPortalCreateWireSchema>;
+/** Output of `bt.judgingPortal.create`. The new event. */
+export type JudgingPortalCreateOutput = JudgingEvent;
+export const JudgingPortalCreateOutputSchema: z.ZodType<JudgingPortalCreateOutput> = z.lazy(() => JudgingEventSchema);
+
+/** Input for `bt.eventImage.uploadUrl`. */
+export interface EventImageUploadUrlInput {
+  /** Image MIME type. */
+  fileType: string;
+  /** Original file name, including extension. */
+  fileName: string;
+  /** Image folder. */
+  prefix: "original" | "optimized";
+  /** Event identifier for the storage folder. */
+  eventId: string;
+}
+export const EventImageUploadUrlWireSchema = z.object({
+  fileType: z.string(),
+  fileName: z.string(),
+  prefix: z.enum(["original", "optimized"]),
+  eventId: z.string(),
+});
+/** Everything the server receives for `bt.eventImage.uploadUrl`: scope key, resource key, and input. */
+export type EventImageUploadUrlWire = z.infer<typeof EventImageUploadUrlWireSchema>;
+/** Output of `bt.eventImage.uploadUrl`. Upload destination. */
+export type EventImageUploadUrlOutput = {
+  /** Signed PUT URL. */
+  uploadUrl: string;
+  /** Permanent public image URL. */
+  publicUrl: string;
+};
+export const EventImageUploadUrlOutputSchema: z.ZodType<EventImageUploadUrlOutput> = z.object({
+  uploadUrl: z.string(),
+  publicUrl: z.string(),
+});
 
 export const JudgingInfoWireSchema = z.object({
   eventID: z.string(),

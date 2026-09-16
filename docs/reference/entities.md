@@ -20,7 +20,7 @@ What anyone may see before logging in.
 
 | Field | Type | Description |
 |---|---|---|
-| `settings` | object | Name and phase only. |
+| `settings` | object | Public name, phase and branding. |
 | `links` | array | Home-page links, in order. |
 
 ## JudgingSettings
@@ -30,6 +30,7 @@ Event phase and switches. Part of JudgingEvent. The backend enforces `phase`, `l
 | Field | Type | Description |
 |---|---|---|
 | `eventName` | string | Display name, e.g. `HelloHacks 2027`. |
+| `imageUrl` | string? | Public event photo or logo URL. |
 | `phase` | enum | `submission`: teams edit their entries. `prelim`: judges score. `finals`: finals judges score finalist teams. `closed`: nothing changes. |
 | `finalsTeamIds` | array | Teams in the finals round. Empty until finals are set up. |
 | `finalsJudgeIds` | array | Judges who score finals. Empty until finals are set up. |

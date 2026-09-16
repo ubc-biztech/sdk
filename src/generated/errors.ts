@@ -3,24 +3,34 @@ import { BtError } from "../core/runtime.js";
 
 export { BtError, ApiError, NotAuthenticatedError, InputError, ContractViolationError } from "../core/runtime.js";
 
-/** No judging has been set up for this event. `admin.set` creates it. */
-export class EventNotFoundError extends BtError {
-  override readonly name = "EventNotFoundError";
-}
-
-/** The code matches no judge or team of this event (or no judging exists for it yet). */
-export class UnknownCodeError extends BtError {
-  override readonly name = "UnknownCodeError";
-}
-
 /** The token is valid but its account is not a BizTech admin. */
 export class ForbiddenError extends BtError {
   override readonly name = "ForbiddenError";
 }
 
-/** A required field is missing, the phase is not one of the four, or two rubric criteria share an id. */
+/** Invalid event name, ID or year. */
 export class InvalidInputError extends BtError {
   override readonly name = "InvalidInputError";
+}
+
+/** Create the event first. */
+export class EventNotFoundError extends BtError {
+  override readonly name = "EventNotFoundError";
+}
+
+/** The ID and year already exist; select that event instead. */
+export class EventExistsError extends BtError {
+  override readonly name = "EventExistsError";
+}
+
+/** Missing fields or a non-image file type. */
+export class InvalidImageError extends BtError {
+  override readonly name = "InvalidImageError";
+}
+
+/** The code matches no judge or team of this event (or no judging exists for it yet). */
+export class UnknownCodeError extends BtError {
+  override readonly name = "UnknownCodeError";
 }
 
 /** No such team. */
