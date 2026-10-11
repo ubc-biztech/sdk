@@ -34,7 +34,7 @@ const meta = {
   },
   "judging.admin.set": {
     key: "judging.admin.set", method: "PUT", path: "/judging/{eventID}/{year}", query: [], fixedQuery: {},
-    auth: "admin", credential: "token", input: S.JudgingAdminSetWireSchema, output: S.JudgingAdminSetOutputSchema, errors: { 406: E.InvalidInputError, 403: E.ForbiddenError },
+    auth: "admin", credential: "token", input: S.JudgingAdminSetWireSchema, output: S.JudgingAdminSetOutputSchema, errors: { 406: E.InvalidInputError, 409: E.RubricLockedError, 403: E.ForbiddenError },
   },
   "judging.admin.reviews": {
     key: "judging.admin.reviews", method: "GET", path: "/judging/{eventID}/{year}/admin/reviews", query: ["round","teamId","judgeId"], fixedQuery: {},
@@ -131,7 +131,7 @@ export function createClient(config: ClientConfig) {
          * 
          * Auth: `admin` — A Cognito ID token for a BizTech exec (today: a verified @ubcbiztech.com email). Not a code.
          * Route: `PUT /judging/{eventID}/{year}`
-         * Throws: `InvalidInputError` (406) A required field is missing, the phase is not one of the four, or two rubric criteria share an id.; `ForbiddenError` (403) The token is valid but its account is not a BizTech admin.
+         * Throws: `InvalidInputError` (406) A required field, phase, or rubric is invalid.; `RubricLockedError` (409) Scoring fields changed for a round that has started or has reviews. Only name and guidance may change.; `ForbiddenError` (403) The token is valid but its account is not a BizTech admin.
          */
         set: (input: S.JudgingAdminSetInput) => rt.call<S.JudgingAdminSetOutput>(meta["judging.admin.set"], { eventID, year, ...input }),
         /**
@@ -158,7 +158,7 @@ export function createClient(config: ClientConfig) {
          * 
          * Auth: `judge` — A judge's code for the event. A team code gets 403.
          * Route: `PUT /judging/{eventID}/{year}/reviews/{id}`
-         * Throws: `UnknownCodeError` (401) The code matches no judge or team of this event (or no judging exists for it yet).; `ForbiddenError` (403) The code belongs to a team, not a judge.; `TeamNotFoundError` (404) No such team.; `InvalidScoresError` (406) A criterion is missing, extra, or out of range.; `PhaseClosedError` (409) Judging is not open, there is no rubric, or this judge or team is not in the finals.
+         * Throws: `UnknownCodeError` (401) The code matches no judge or team of this event (or no judging exists for it yet).; `ForbiddenError` (403) The code belongs to a team, not a judge.; `TeamNotFoundError` (404) No such team.; `InvalidScoresError` (406) A criterion is missing, extra, or out of range.; `PhaseClosedError` (409) Judging is not open, the expected round changed, there is no rubric, or this judge or team is not in the finals.
          */
         review: (input: S.JudgingTeamReviewInput) => rt.call<S.JudgingTeamReviewOutput>(meta["judging.team.review"], { eventID, year, id, ...input }),
         /**

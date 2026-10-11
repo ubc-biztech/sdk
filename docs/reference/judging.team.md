@@ -51,6 +51,7 @@ Create or replace the caller's review of this team for the current phase's round
 
 | Field | Type | Description |
 |---|---|---|
+| `round` | enum? | Expected active round. Send to reject a stale scorecard after a phase change. |
 | `scores` | record | Keyed by criterion id. Every criterion, nothing else. |
 | `feedback` | string? | Written feedback. |
 
@@ -64,7 +65,7 @@ Create or replace the caller's review of this team for the current phase's round
 | `ForbiddenError` | 403 | The code belongs to a team, not a judge. |
 | `TeamNotFoundError` | 404 | No such team. |
 | `InvalidScoresError` | 406 | A criterion is missing, extra, or out of range. |
-| `PhaseClosedError` | 409 | Judging is not open, there is no rubric, or this judge or team is not in the finals. |
+| `PhaseClosedError` | 409 | Judging is not open, the expected round changed, there is no rubric, or this judge or team is not in the finals. |
 
 ## Links
 

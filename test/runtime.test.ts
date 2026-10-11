@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createClient, ApiError, NotAuthenticatedError, InputError, ContractViolationError, EventNotFoundError, UnknownCodeError, ForbiddenError, PhaseClosedError } from "../src/index.js";
+import { createClient, ApiError, NotAuthenticatedError, InputError, ContractViolationError, EventNotFoundError, UnknownCodeError, ForbiddenError, PhaseClosedError, RubricLockedError } from "../src/index.js";
 
 type Call = { url: string; init: RequestInit };
 function fake(status: number, body: unknown) {
@@ -54,6 +54,22 @@ describe("credentials", () => {
 });
 
 describe("chained client", () => {
+  it("preserves round rubrics through request and response validation", async () => {
+    const rubric = { name: "Semifinals", scaleMax: 10, scoreMode: "weighted" as const, criteria: [{ id: "problem", label: "Problem", weight: 10, maxScore: 10 }] };
+    const roundRubrics = { prelim: rubric, finals: { ...rubric, name: "Finals", criteria: [{ id: "pitch", label: "Pitch", weight: 10, maxScore: 10 }] } };
+    const { calls, fetch } = fake(200, { ...doc, roundRubrics });
+    const result = await createClient({ baseUrl: "https://x", fetch, getToken: () => "jwt" }).judging("product-plus", 2026).admin.set({ ...doc, roundRubrics });
+    expect(JSON.parse(calls[0]!.init.body as string).roundRubrics).toEqual(roundRubrics);
+    expect(result.roundRubrics).toEqual(roundRubrics);
+  });
+
+  it("sends the expected round and maps locked rubric writes", async () => {
+    const { calls, fetch } = fake(200, review);
+    await createClient({ baseUrl: "https://x", fetch, getCode: () => "c" }).judging("product-plus", 2026).team("t1").review({ round: "prelim", scores: { design: 4 } });
+    expect(JSON.parse(calls[0]!.init.body as string).round).toBe("prelim");
+    await expect(createClient({ baseUrl: "https://x", fetch: fake(409, { message: "Rubric locked" }).fetch, getToken: () => "t" }).judging("product-plus", 2026).admin.set(doc)).rejects.toBeInstanceOf(RubricLockedError);
+  });
+
   it("calls fetch with globalThis as `this`, as browsers require", async () => {
     let seen: unknown = "unset";
     const strict = async function (this: unknown) {

@@ -33,6 +33,11 @@ export class UnknownCodeError extends BtError {
   override readonly name = "UnknownCodeError";
 }
 
+/** Scoring fields changed for a round that has started or has reviews. Only name and guidance may change. */
+export class RubricLockedError extends BtError {
+  override readonly name = "RubricLockedError";
+}
+
 /** No such team. */
 export class TeamNotFoundError extends BtError {
   override readonly name = "TeamNotFoundError";
@@ -48,7 +53,7 @@ export class InvalidScoresError extends BtError {
   override readonly name = "InvalidScoresError";
 }
 
-/** Judging is not open, there is no rubric, or this judge or team is not in the finals. */
+/** Judging is not open, the expected round changed, there is no rubric, or this judge or team is not in the finals. */
 export class PhaseClosedError extends BtError {
   override readonly name = "PhaseClosedError";
 }

@@ -46,6 +46,25 @@
           "nullable": true,
           "description": "The rubric, or null before one is set."
         },
+        "roundRubrics": {
+          "kind": "object",
+          "fields": {
+            "prelim": {
+              "kind": "ref",
+              "entity": "Rubric",
+              "optional": true,
+              "description": "Preliminary or semifinal rubric. Falls back to rubric when absent."
+            },
+            "finals": {
+              "kind": "ref",
+              "entity": "Rubric",
+              "optional": true,
+              "description": "Finals rubric. Falls back to rubric when absent."
+            }
+          },
+          "optional": true,
+          "description": "Round overrides. An empty object means both rounds use rubric; absent on older servers without round-rubric support."
+        },
         "links": {
           "kind": "array",
           "items": {
@@ -885,7 +904,11 @@
           "errors": {
             "InvalidInput": {
               "status": 406,
-              "description": "A required field is missing, the phase is not one of the four, or two rubric criteria share an id."
+              "description": "A required field, phase, or rubric is invalid."
+            },
+            "RubricLocked": {
+              "status": 409,
+              "description": "Scoring fields changed for a round that has started or has reviews. Only name and guidance may change."
             },
             "Forbidden": {
               "status": 403,
@@ -906,6 +929,25 @@
               "optional": true,
               "nullable": true,
               "description": "The rubric. Omit or null for none."
+            },
+            "roundRubrics": {
+              "kind": "object",
+              "fields": {
+                "prelim": {
+                  "kind": "ref",
+                  "entity": "Rubric",
+                  "optional": true,
+                  "description": "Preliminary or semifinal rubric. Falls back to rubric when absent."
+                },
+                "finals": {
+                  "kind": "ref",
+                  "entity": "Rubric",
+                  "optional": true,
+                  "description": "Finals rubric. Falls back to rubric when absent."
+                }
+              },
+              "optional": true,
+              "description": "Round overrides. Omit to preserve existing overrides. Scoring fields lock independently once a round starts or has reviews; name and guidance remain editable."
             },
             "links": {
               "kind": "array",
@@ -1187,12 +1229,21 @@
             },
             "PhaseClosed": {
               "status": 409,
-              "description": "Judging is not open, there is no rubric, or this judge or team is not in the finals."
+              "description": "Judging is not open, the expected round changed, there is no rubric, or this judge or team is not in the finals."
             }
           },
           "description": "Create or replace the caller's review of this team for the current phase's round. Every rubric criterion must be present and in range; totals are computed by the backend. Only while the phase is `prelim` or `finals`; in finals only finals judges may score finalist teams.",
           "auth": "judge",
           "input": {
+            "round": {
+              "kind": "enum",
+              "values": [
+                "prelim",
+                "finals"
+              ],
+              "optional": true,
+              "description": "Expected active round. Send to reject a stale scorecard after a phase change."
+            },
             "scores": {
               "kind": "record",
               "values": {

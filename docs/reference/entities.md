@@ -10,6 +10,7 @@ Everything about one event's judging except the reviews. One backend row, read a
 | `updatedAt` | string | ISO-8601, set by the backend on every write. |
 | `settings` | ref | Phase and switches. |
 | `rubric` | ref \| null | The rubric, or null before one is set. |
+| `roundRubrics` | object? | Round overrides. An empty object means both rounds use rubric; absent on older servers without round-rubric support. |
 | `links` | array | Home-page links, in order. |
 | `judges` | array | Every judge. Codes only on the admin actions. |
 | `teams` | array | Every team. Codes only on the admin actions. |

@@ -13,6 +13,13 @@ export interface JudgingEvent {
   settings: JudgingSettings;
   /** The rubric, or null before one is set. */
   rubric: Rubric | null;
+  /** Round overrides. An empty object means both rounds use rubric; absent on older servers without round-rubric support. */
+  roundRubrics?: {
+    /** Preliminary or semifinal rubric. Falls back to rubric when absent. */
+    prelim?: Rubric;
+    /** Finals rubric. Falls back to rubric when absent. */
+    finals?: Rubric;
+  };
   /** Home-page links, in order. */
   links: JudgingLink[];
   /** Every judge. Codes only on the admin actions. */
@@ -25,6 +32,10 @@ export const JudgingEventSchema: z.ZodType<JudgingEvent> = z.object({
   updatedAt: z.string(),
   settings: z.lazy(() => JudgingSettingsSchema),
   rubric: z.lazy(() => RubricSchema).nullable(),
+  roundRubrics: z.object({
+    prelim: z.lazy(() => RubricSchema).optional(),
+    finals: z.lazy(() => RubricSchema).optional(),
+  }).optional(),
   links: z.array(z.lazy(() => JudgingLinkSchema)),
   judges: z.array(z.lazy(() => JudgeSchema)),
   teams: z.array(z.lazy(() => JudgingTeamSchema)),
@@ -481,6 +492,13 @@ export interface JudgingAdminSetInput {
   settings: JudgingSettings;
   /** The rubric. Omit or null for none. */
   rubric?: Rubric | null;
+  /** Round overrides. Omit to preserve existing overrides. Scoring fields lock independently once a round starts or has reviews; name and guidance remain editable. */
+  roundRubrics?: {
+    /** Preliminary or semifinal rubric. Falls back to rubric when absent. */
+    prelim?: Rubric;
+    /** Finals rubric. Falls back to rubric when absent. */
+    finals?: Rubric;
+  };
   /** Home-page links. */
   links: JudgingLink[];
   /** Every judge. */
@@ -519,6 +537,10 @@ export const JudgingAdminSetWireSchema = z.object({
   year: z.number().int(),
   settings: z.lazy(() => JudgingSettingsSchema),
   rubric: z.lazy(() => RubricSchema).nullable().optional(),
+  roundRubrics: z.object({
+    prelim: z.lazy(() => RubricSchema).optional(),
+    finals: z.lazy(() => RubricSchema).optional(),
+  }).optional(),
   links: z.array(z.lazy(() => JudgingLinkSchema)),
   judges: z.array(z.object({
     id: z.string().optional(),
@@ -599,6 +621,8 @@ export const JudgingTeamUpdateOutputSchema: z.ZodType<JudgingTeamUpdateOutput> =
 
 /** Input for `bt.judging(eventID, year).team(id).review`. */
 export interface JudgingTeamReviewInput {
+  /** Expected active round. Send to reject a stale scorecard after a phase change. */
+  round?: "prelim" | "finals";
   /** Keyed by criterion id. Every criterion, nothing else. */
   scores: Record<string, number>;
   /** Written feedback. */
@@ -608,6 +632,7 @@ export const JudgingTeamReviewWireSchema = z.object({
   eventID: z.string(),
   year: z.number().int(),
   id: z.string(),
+  round: z.enum(["prelim", "finals"]).optional(),
   scores: z.record(z.string(), z.number()),
   feedback: z.string().optional(),
 });
