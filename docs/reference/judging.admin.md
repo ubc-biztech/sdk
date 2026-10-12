@@ -33,6 +33,7 @@ Replace the whole document, creating it if needed. Judges and teams without an `
 |---|---|---|
 | `settings` | ref | Phase and switches. |
 | `rubric` | ref \| null? | The rubric. Omit or null for none. |
+| `roundRubrics` | object? | Round overrides. Omit to preserve existing overrides. Scoring fields lock independently once a round starts or has reviews; name and guidance remain editable. |
 | `links` | array | Home-page links. |
 | `judges` | array | Every judge. |
 | `teams` | array | Every team. |
@@ -43,7 +44,8 @@ Replace the whole document, creating it if needed. Judges and teams without an `
 
 | Error | HTTP | When |
 |---|---|---|
-| `InvalidInputError` | 406 | A required field is missing, the phase is not one of the four, or two rubric criteria share an id. |
+| `InvalidInputError` | 406 | A required field, phase, or rubric is invalid. |
+| `RubricLockedError` | 409 | Scoring fields changed for a round that has started or has reviews. Only name and guidance may change. |
 | `ForbiddenError` | 403 | The token is valid but its account is not a BizTech admin. |
 
 ## `bt.judging(eventID, year).admin.reviews(input)`

@@ -2,7 +2,7 @@
 // BizTech account: an organizer mints them a code, sent as X-Judging-Code. Organizers send a
 // Cognito ID token, and the backend keeps their work on separate /admin routes.
 import { resource, action, str, list, obj, ref } from "../../core/define.js";
-import { JudgingEvent, JudgingInfo, JudgingLink, JudgingSettings, Rubric, judgeFields, teamFields } from "./entities.js";
+import { JudgingEvent, JudgingInfo, JudgingLink, JudgingSettings, Rubric, judgeFields, teamFields, roundRubricFields } from "./entities.js";
 import { reviewFilters, reviewsOutput } from "./reviews.js";
 import { judgingScope, base, unknownCode, notAdmin } from "./shared.js";
 
@@ -48,12 +48,13 @@ export const judgingAdmin = resource({
       input: {
         settings: ref(JudgingSettings, { description: "Phase and switches." }),
         rubric: ref(Rubric, { optional: true, nullable: true, description: "The rubric. Omit or null for none." }),
+        roundRubrics: obj(roundRubricFields, { optional: true, description: "Round overrides. Omit to preserve existing overrides. Scoring fields lock independently once a round starts or has reviews; name and guidance remain editable." }),
         links: list(ref(JudgingLink, { description: "A link." }), { description: "Home-page links." }),
         judges: list(obj({ id: str({ optional: true, description: "Keep an existing judge's id; omit for a new one." }), ...judgeFields, code: str({ optional: true, description: "Keep an existing judge's code; omit to mint one." }) }, { description: "A judge." }), { description: "Every judge." }),
         teams: list(obj({ id: str({ optional: true, description: "Keep an existing team's id; omit for a new one." }), ...teamFields, code: str({ optional: true, description: "Keep an existing team's code; omit to mint one." }) }, { description: "A team." }), { description: "Every team." }),
       },
       output: ref(JudgingEvent, { description: "The stored document with every code." }),
-      errors: { InvalidInput: { status: 406, description: "A required field is missing, the phase is not one of the four, or two rubric criteria share an id." }, ...notAdmin },
+      errors: { InvalidInput: { status: 406, description: "A required field, phase, or rubric is invalid." }, RubricLocked: { status: 409, description: "Scoring fields changed for a round that has started or has reviews. Only name and guidance may change." }, ...notAdmin },
       route: { method: "PUT", path: base },
     }),
     reviews: action({

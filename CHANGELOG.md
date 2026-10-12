@@ -3,6 +3,11 @@
 Versions follow the rule in `scripts/semver.ts`: while the major is 0, a breaking change bumps the
 minor. `npm run check` tells you which bump a change needs.
 
+## 0.11.0 — 2026-10-11
+
+- Optional per-round judging rubrics, with legacy rubric fallback and a typed `RubricLockedError`.
+- Optional expected round on review submission to reject scorecards from a previous phase.
+
 ## 0.9.0 — 2026-09-15
 
 - `JudgingSchedule.exclusions` (optional): judge and team pairs removed from the judge's list without

@@ -87,6 +87,11 @@ export const JudgingLink = entity({
   },
 });
 
+export const roundRubricFields = {
+  prelim: ref(Rubric, { optional: true, description: "Preliminary or semifinal rubric. Falls back to rubric when absent." }),
+  finals: ref(Rubric, { optional: true, description: "Finals rubric. Falls back to rubric when absent." }),
+} satisfies Fields;
+
 export const judgeFields = {
   name: str({ description: "Display name, shown on reviews." }),
   assignedTeamIds: list(str({ description: "Team id." }), { optional: true, description: "Teams this judge scores in prelims, in order. Chosen by the portal; not enforced by the backend." }),
@@ -139,6 +144,7 @@ export const JudgingEvent = entity({
     updatedAt: str({ description: "ISO-8601, set by the backend on every write." }),
     settings: ref(JudgingSettings, { description: "Phase and switches." }),
     rubric: ref(Rubric, { nullable: true, description: "The rubric, or null before one is set." }),
+    roundRubrics: obj(roundRubricFields, { optional: true, description: "Round overrides. An empty object means both rounds use rubric; absent on older servers without round-rubric support." }),
     links: list(ref(JudgingLink, { description: "A link." }), { description: "Home-page links, in order." }),
     judges: list(ref(Judge, { description: "A judge." }), { description: "Every judge. Codes only on the admin actions." }),
     teams: list(ref(JudgingTeam, { description: "A team." }), { description: "Every team. Codes only on the admin actions." }),
